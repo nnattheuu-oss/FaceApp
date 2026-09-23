@@ -33,6 +33,8 @@ import { SCIENCE_POINTS, SCIENCE_INTRO } from "../src/reading/science.js";
 import { NOT_READ_LABEL, NOTHING_READ, EMPHASIS_LEAD } from "../src/reading/summary.js";
 import { PALACE_SCOPE_NOTE } from "../src/readingview.js";
 import { INSIGHTS_COPY } from "../src/utils/insights.js";
+import { PALACE_INTERPRETATIONS, INTERPRETATION_LABEL, PALACE_BASIS_NOTE }
+  from "../src/reading/palace-interpretations.js";
 import { HARMONY_LEAD, HARMONY_NOT_MEASURED, SOURCES_DIFFER as HARMONY_SOURCES_DIFFER }
   from "../src/reading/harmony.js";
 
@@ -55,6 +57,10 @@ const MODULE_A_COPY = {
   // check below -- which only walks src/reading/ -- cannot catch it going
   // unregistered. Listed explicitly for that reason.
   INSIGHTS: INSIGHTS_COPY,
+  // SpiritMaxx's own Twelve Palaces interpretations (L-05). App-authored, so
+  // they carry no tradition marker by design, and are therefore held to the
+  // assertive-phrasing and negative-verdict guards WITHOUT the marker escape.
+  PALACE_INTERPRETATIONS: { PALACE_INTERPRETATIONS, INTERPRETATION_LABEL, PALACE_BASIS_NOTE },
   // The beta scanner's copy. It ships from /beta/ to the same people, so it is
   // scanned by the same guard: an unregistered surface ships unread, whichever
   // URL it is served from.

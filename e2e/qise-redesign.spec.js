@@ -54,6 +54,16 @@ const reading = {
 };
 
 async function seedReading(page) {
+  // The palaces are paid under the v1 hard paywall (DR-2026-09-23-LAUNCH-V1,
+  // L-03). These tests exercise the palace experience a PAYING user sees, so
+  // Play is faked to report the lifetime purchase. The unpaid path is covered
+  // by e2e/qise-paywall.spec.js.
+  await page.addInitScript(() => {
+    window.getDigitalGoodsService = async () => ({
+      listPurchases: async () => [{ itemId: "spiritmaxx_full_reading_lifetime", purchaseToken: "e2e" }],
+      getDetails: async () => [],
+    });
+  });
   await page.goto("/qise.html");
   await page.evaluate(async (record) => {
     const [{ createConsent }, { openStore }] = await Promise.all([
@@ -74,7 +84,7 @@ test("Today gives an immediate path into all twelve palaces", async ({ page }, t
   await seedReading(page);
 
   await expect(page.locator('[data-reading-panel="today"]')).toBeVisible();
-  await expect(page.getByText("12 of 12 palaces revealed")).toBeVisible();
+  await expect(page.getByText("12 of 12 palaces open")).toBeVisible();
   await expect(page.getByRole("button", { name: "Enter 12 palaces" })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("today-mobile.png"), fullPage: true });
 

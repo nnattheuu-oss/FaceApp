@@ -10,14 +10,8 @@ import {
   buildReportPayload, sendReport,
 } from "./report.js";
 import { renderAbout, loadBuildInfo } from "./about.js";
-import {
-  isUnlocked, redeemPaymentParam, buildShareText, shareText,
-  recordShare, getShareCount, resetUnlockState, simulateShares,
-  getUnlockState, grantLifetime, grantSubscription, forceExpireSubscription,
-  subscriptionRemainingMs,
-} from "./shareGate.js";
-import { CHECKOUT_LIFETIME_LINK, CHECKOUT_WEEKLY_LINK, CHECKOUT_CONFIGURED }
-  from "./flags.js";
+import { connectBilling, readEntitlement, hasFeature } from "./billing/entitlements.js";
+import { FEATURE } from "./billing/catalogue.js";
 
 const $ = (id) => document.getElementById(id);
 const CONSENT_KEY = "mienshiang.consent.v1";
@@ -25,12 +19,19 @@ const CONSENT_KEY = "mienshiang.consent.v1";
 let file = null;
 let objectUrl = null;
 
-// ─────────────────────────────────── payment redirect on page load ──────────
-// Must run before any UI renders, per the unlock priority order.
-if (redeemPaymentParam(location.search)) {
-  // Remove the param so it doesn't persist in browser history.
-  history.replaceState(null, "", location.pathname);
+/*
+ * Paid access, from Google Play (L-03). Null until Play has answered, and null
+ * means locked: the page renders the free reading first and re-renders if Play
+ * reports a purchase. There is no redeem URL and no local unlock flag any more
+ * -- see src/billing/entitlements.js for why.
+ */
+let classicEntitlement = null;
+async function refreshEntitlement() {
+  const read = await readEntitlement(await connectBilling(window));
+  classicEntitlement = read.entitlement;
+  if (lastResult && hasFeature(classicEntitlement, FEATURE.FULL_TRAIT_MAPPING)) render(lastResult);
 }
+refreshEntitlement().catch((err) => console.warn("Could not check purchases.", err));
 
 // Cached last result, used to re-render after an in-session unlock.
 let lastResult = null;
@@ -173,14 +174,14 @@ function render(r) {
   // substitutes for the other.
   overviewParts.push(renderMeasurementLimits(baseline, notMeasured));
 
-  // MODULE A — the reading, gated when the user has not yet unlocked.
-  // Five Elements (face shape) is always visible; the remaining sections are
-  // shown only after sharing or paying.
+  // MODULE A — the reading, behind the v1 hard paywall (L-03). Three
+  // Sections and qi se are free; the trait mapping and palaces are not
+  // rendered at all until Play reports a purchase.
   if (!result.halted) {
-    const locked = !isUnlocked();
+    const locked = !hasFeature(classicEntitlement, FEATURE.FULL_TRAIT_MAPPING);
     readingParts.push(renderReadingGated(r.reading, {
       locked,
-      overlayHtml: locked ? gateOverlayHtml(getShareCount()) : "",
+      overlayHtml: locked ? gateOverlayHtml() : "",
       insightsCaveatText: insightsCaveatText(),
     }));
     detailsParts.push(renderScienceLink());
@@ -226,7 +227,6 @@ function render(r) {
   wireScienceScreen();
   wireReportControl();
   wireShare(r);
-  wireShareGate(r);
   setStep(3);
 }
 
@@ -316,9 +316,9 @@ function wireShare(r) {
     const original = btn.textContent;
     try {
       const includePhoto = $("share-photo")?.checked === true;
-      // The card mirrors the gate: locked unless this device has unlocked.
+      // The card mirrors the paywall: locked unless Play reports a purchase.
       const model = buildShareModel(r.reading, shareCardCaveatText(), {
-        unlocked: isUnlocked(),
+        unlocked: hasFeature(classicEntitlement, FEATURE.FULL_TRAIT_MAPPING),
         url: location.href.replace(/[?#].*$/, ""),
       });
       const blob = await renderShareBlob(model, "story", includePhoto ? r.canvas : null);
@@ -337,123 +337,26 @@ function wireShare(r) {
   });
 }
 
-// ----------------------------------------------- share-to-unlock gate ------
+// ------------------------------------------------------------ paywall ------
 
 /**
- * HTML for the frosted overlay that sits over the gated reading sections.
- * Rendered purely — no DOM access. Injected via renderReadingGated.
- *
- * All strings here are UI chrome (buttons, counts, a short prompt). They are
- * not Module A reading copy and carry no health vocabulary.
- *
- * @param {number} shareCount  shares completed so far (0, 1, or 2)
+ * The locked panel for the classic view. Purchases are made in the scanner
+ * (qise.html), which is the v1 reading engine (L-07); this view only points
+ * there. No price, no checkout link, no share-to-unlock (L-04).
  */
-function gateOverlayHtml(shareCount) {
-  const remaining = Math.max(0, 2 - shareCount);
-  const progressLabel = shareCount >= 2
-    ? "Shared"
-    : shareCount === 1 ? "1 of 2 shared" : "0 of 2 shared";
-
-  /* Paid options render as disabled buttons until the checkout links are real.
-   * Sending someone to a placeholder checkout that cannot complete is worse
-   * than showing the price and saying it is not ready — the first looks like a
-   * payment failure and the second is simply true. CHECKOUT_CONFIGURED is
-   * derived from the links themselves, so this cannot drift out of step. */
-  const payCard = (id, href, price, note, popular) => {
-    const inner = CHECKOUT_CONFIGURED
-      ? `<a class="gate-btn gate-btn-pay" href="${href}">${price}</a>`
-      : `<button id="${id}" class="gate-btn gate-btn-pay" type="button">${price} (coming soon)</button>`;
-    return `
-      <div class="gate-opt${popular ? " gate-opt-popular" : ""}">
-        ${popular ? '<p class="gate-flag">Most popular</p>' : ""}
-        ${inner}
-        <p class="gate-note">${note}</p>
-      </div>`;
-  };
-
+function gateOverlayHtml() {
   return `
     <div class="gate-card">
-      <p class="gate-title">Unlock the full reading</p>
-    <p class="gate-sub">Three Sections, Qi Se and Twelve Palaces</p>
+      <p class="gate-title">The full reading</p>
+      <p class="gate-sub">Five Elements, the shape narrative and the Twelve Palaces</p>
       <div class="gate-opts">
         <div class="gate-opt">
-          <button id="gate-share" class="gate-btn gate-btn-share" type="button">
-            Share with ${remaining} friend${remaining !== 1 ? "s" : ""}
-          </button>
-          <p class="gate-note">Free &middot; <span class="gate-progress">${progressLabel}</span></p>
+          <a class="gate-btn gate-btn-pay" href="./qise.html">Open the scanner</a>
+          <p class="gate-note">Available through the app on Google Play</p>
         </div>
-        ${payCard("gate-notify-lifetime", CHECKOUT_LIFETIME_LINK, "Unlock forever &mdash; $4.99", "One-time", true)}
-        ${payCard("gate-notify-weekly", CHECKOUT_WEEKLY_LINK, "Weekly access &mdash; $2.99", "Renews weekly", false)}
       </div>
-      <p class="gate-caveat">For entertainment and self-reflection only.
-        Unlocks are stored on this device, so clearing your browser clears them.</p>
+      <p class="gate-caveat">For entertainment and self-reflection only.</p>
     </div>`;
-}
-
-/**
- * Wire the share-gate overlay buttons after render.
- *
- * The share button calls shareText with a tradition-framed message (no score,
- * no health claims), records the share, and re-renders on unlock.
- */
-function wireShareGate(r) {
-  const shareBtn = $("gate-share");
-  if (!shareBtn) return; // not rendered (user is already unlocked)
-
-  shareBtn.addEventListener("click", async () => {
-    shareBtn.disabled = true;
-    const settledLabel = () => {
-      const remaining = Math.max(0, 2 - getShareCount());
-      return `Share with ${remaining} friend${remaining !== 1 ? "s" : ""}`;
-    };
-
-    // Extract face shape name if available — tradition-attributed framing only.
-    const faceShapeName = r.reading?.fiveElements?.available
-      ? r.reading.fiveElements.name
-      : null;
-    const url = location.href.replace(/[?#].*$/, "");
-    const text = buildShareText(faceShapeName, url);
-
-    try {
-      const result = await shareText(text);
-      if (result === "shared" || result === "copied") {
-        const { unlocked } = recordShare();
-        shareBtn.textContent = result === "copied" ? "Link copied!" : "Shared!";
-        if (unlocked && lastResult) {
-          // Re-render the full reading now that the gate is open.
-          setTimeout(() => render(lastResult), 800);
-        } else {
-          // Update the overlay count without a full re-render.
-          const prog = document.querySelector(".gate-progress");
-          if (prog) prog.textContent = `${getShareCount()} of 2 shared`;
-          const rem = Math.max(0, 2 - getShareCount());
-          shareBtn.textContent = `Share with ${rem} friend${rem !== 1 ? "s" : ""}`;
-        }
-      } else if (result === "cancelled") {
-        shareBtn.textContent = settledLabel();
-      } else {
-        shareBtn.textContent = "Could not share";
-      }
-    } catch (err) {
-      shareBtn.textContent = "Could not share";
-      console.error("share gate failed:", err);
-    } finally {
-      shareBtn.disabled = false;
-      setTimeout(() => {
-        if (shareBtn.isConnected) shareBtn.textContent = settledLabel();
-      }, 3500);
-    }
-  });
-
-  // Present only while the checkout links are still placeholders.
-  for (const id of ["gate-notify-lifetime", "gate-notify-weekly"]) {
-    const btn = $(id);
-    if (!btn) continue;
-    btn.addEventListener("click", () => {
-      btn.textContent = "We\u2019ll let you know when it\u2019s ready";
-      btn.disabled = true;
-    });
-  }
 }
 
 // -------------------------------------------------- report this result --
@@ -534,8 +437,9 @@ if ("serviceWorker" in navigator) {
 }
 
 // ----------------------------------------------------------- dev panel ------
-// Triggered by 7 rapid taps on the wordmark. Hidden from normal users.
-// Shows reset controls for the share-gate unlock state.
+// Triggered by 7 rapid taps on the wordmark. It used to hand out every unlock
+// state for free; with real purchases that would be a bypass shipped to every
+// user, so the only action left is resetting consent on this device.
 
 (function wireDevPanel() {
   const wordmark = document.querySelector(".wordmark");
@@ -560,66 +464,17 @@ if ("serviceWorker" in navigator) {
 function openDevPanel() {
   const dlg = $("dev-panel");
   if (!dlg) return;
-
-  /* Loud on purpose. This panel hands out every unlock state for free, so the
-   * one thing that must never happen is it shipping unnoticed. A console line
-   * survives minification, shows up in a remote debugging session on a real
-   * handset, and costs nothing when the panel is absent. */
-  console.warn("\u26A0\uFE0F DEV PANEL ACTIVE \u2014 remove before production release");
-
-  // Interpolated below: all three come from this module's own constants or are
-  // numbers, so there is no user-supplied text on this path.
-  const state = getUnlockState() ?? "locked";
-  const remaining = subscriptionRemainingMs();
-  const days = remaining === null ? null : (remaining / 86400000).toFixed(2);
-
-  const actions = [
-    ["dev-reset", "Reset all unlock state"],
-    ["dev-simulate", "Simulate share \u00D7 2"],
-    ["dev-subscribe", "Start weekly subscription"],
-    ["dev-expire", "Force expire subscription"],
-    ["dev-lifetime", "Force paid-lifetime"],
-    ["dev-consent", "Reset consent"],
-  ];
-
   dlg.innerHTML = `
     <div class="consent" style="min-width:0">
-      <h2 style="font-size:1rem;margin-bottom:.75rem">Dev: unlock state</h2>
-      <p style="font-size:.85rem;color:var(--ink-60);margin:.4rem 0">
-        Current state: <code>${state}</code> &middot;
-        shares: <code>${getShareCount()}</code>${
-          days === null ? "" : ` &middot; expires in <code>${days}d</code>`}
-      </p>
+      <h2 style="font-size:1rem;margin-bottom:.75rem">Dev: this device</h2>
       <div style="display:flex;flex-direction:column;gap:.5rem;margin-top:1rem">
-        ${actions.map(([id, label]) =>
-          `<button id="${id}" class="ghost" type="button">${label}</button>`).join("")}
+        <button id="dev-consent" class="ghost" type="button">Reset consent</button>
         <button id="dev-close" class="ghost" type="button" style="margin-top:.5rem">Close</button>
       </div>
     </div>`;
-
   dlg.showModal();
-
-  // Every action re-renders, so the panel never leaves the screen showing
-  // state it has just invalidated.
-  const act = (id, fn) => dlg.querySelector(`#${id}`)?.addEventListener("click", () => {
-    fn();
-    dlg.close();
-    if (lastResult) render(lastResult);
-  });
-
   dlg.querySelector("#dev-close").addEventListener("click", () => dlg.close());
-  act("dev-reset", resetUnlockState);
-  act("dev-simulate", simulateShares);
-  act("dev-lifetime", grantLifetime);
-  act("dev-subscribe", () => grantSubscription());
-  act("dev-expire", () => {
-    // Reports rather than failing silently: expiring is a no-op unless a
-    // subscription is actually live, and a dead button reads as a bug.
-    if (!forceExpireSubscription()) {
-      console.warn("Dev panel: no live subscription to expire. Start one first.");
-    }
-  });
-  act("dev-consent", () => {
+  dlg.querySelector("#dev-consent").addEventListener("click", () => {
     localStorage.removeItem(CONSENT_KEY);
     location.reload();
   });

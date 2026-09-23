@@ -11,6 +11,7 @@ import { sealModel, sealSvg } from "./seal.js";
 import { passageFor } from "../../qise/passages.js";
 import { isLowConfidence } from "../../qise/baseline.js";
 import { compositionOf, COMPOSITION_COLOURS } from "../../qise/composition.js";
+import { PALACE_INTERPRETATIONS } from "../../reading/palace-interpretations.js";
 
 export const COMPOSITION_LABELS = Object.freeze({
   chi: Object.freeze({ name: "chi", note: "warm note" }),
@@ -252,6 +253,11 @@ export function integratedReadingModel(reading) {
     reading: (palace.heritageStatus || palaceSource?.heritageStatus) === "RUNTIME_PROSE"
       ? palace.reading || null
       : null,
+    // Stored readings carry no interpretation (it is corpus, not measurement),
+    // so it is looked up by key at render time. A reading made before L-05
+    // therefore gains the interpretation too, which is correct: it was never
+    // derived from the face.
+    interpretation: PALACE_INTERPRETATIONS[palace.key] ?? null,
   }));
   const measuredPalaces = allPalaces.filter((palace) => palace.measured);
   const harmonyComponents = (harmony?.components || []).map((component) => ({

@@ -5,7 +5,7 @@
  * second launch works with no connection at all. */
 // Bumped when the shell list changes: the activate handler deletes every cache
 // whose name is not CACHE, so a stale v1 holding an old SHELL cannot survive.
-const CACHE = "mienshiang-v25";
+const CACHE = "mienshiang-v26";
 const SHELL = [
   "./", "./index.html", "./ui.js", "./analysis.js", "./engine.js",
   "./measurement-method.js",
@@ -24,7 +24,12 @@ const SHELL = [
   "./reading/index.js", "./reading/five-elements.js", "./reading/three-courts.js",
   "./reading/twelve-palaces.js", "./reading/qi-se.js", "./reading/science.js",
   "./reading/summary.js", "./reading/harmony.js", "./reading/provenance.js",
-  "./readingview.js", "./scienceview.js", "./sharecard.js", "./shareGate.js",
+  "./readingview.js", "./scienceview.js", "./sharecard.js",
+  "./reading/palace-interpretations.js",
+  // Play Billing (DR-2026-09-23-LAUNCH-V1). Statically imported by both
+  // ui.js and ui/qise/app.js; missing any of these is item 15's white screen.
+  "./billing/catalogue.js", "./billing/entitlements.js", "./billing/offers.js",
+  "./billing/purchase.js",
   // Both module adapters ship in both flavours. The flag governs BEHAVIOUR,
   // not bytes — see the honest limitation in flags.js. Omitting safety.js here
   // while rules.js still imports it would break the app offline rather than
@@ -47,7 +52,7 @@ const SHELL = [
   "./qise/baseline.js", "./qise/store.js", "./qise/passages.js",
   "./qise/patterns.js", "./qise/composition.js", "./qise/integrated.js",
   "./ui/qise/palette.js", "./ui/qise/seal.js", "./ui/qise/screens.js",
-  "./ui/qise/share.js", "./ui/qise/theme.js", "./ui/qise/exposure-halo.js", "./ui/qise/app.js",
+  "./ui/qise/share.js", "./ui/qise/paywall.js", "./ui/qise/theme.js", "./ui/qise/exposure-halo.js", "./ui/qise/app.js",
   "./manifest.webmanifest", "./icon-192.png", "./icon-512.png",
   "./icon-512-maskable.png",
 ];

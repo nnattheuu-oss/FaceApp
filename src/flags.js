@@ -62,36 +62,10 @@ export const BUILD_FLAVOUR = MODULE_B_SAFETY_REFERRALS
  */
 export const MODULE_B_IS_NEVER_MONETISED = true;
 
-/**
- * Lemon Squeezy hosted checkout links.
- *
- * PLACEHOLDER PRODUCT IDS. These are URL-shaped on purpose rather than empty
- * strings or bare tokens: the bundle lint's egress allowlist matches the whole
- * URL anchored at both ends, so a malformed or off-host link fails the build
- * instead of shipping. Replace only the path segment once the products exist
- * in the dashboard; the host must not change without changing the allowlist.
- *
- * NO QUERY STRING, EVER. The allowlist pattern rejects one, and the reason is
- * substantive: appending anything here would hand a value derived from the
- * user's face to a third party, in a URL the app itself invites them to open.
- *
- * Only Module A (entertainment) content is ever behind this gate.
- * MODULE_B_IS_NEVER_MONETISED = true is a constraint on Module B, not on this.
- *
- * ASCII only in this file -- see the comment block at the top.
+/*
+ * Payments. The Lemon Squeezy checkout links that lived here were removed for
+ * launch v1 (DR-2026-09-23-LAUNCH-V1): an app distributed on Google Play must
+ * sell digital content through Play Billing, and a hosted web checkout linked
+ * from inside the app is exactly what Play's Payments policy prohibits. The
+ * catalogue now lives in billing/catalogue.js and prices come from Play.
  */
-export const CHECKOUT_LIFETIME_LINK =
-  "https://checkout.lemonsqueezy.com/buy/PRODUCT-ID-ONE-TIME";
-export const CHECKOUT_WEEKLY_LINK =
-  "https://checkout.lemonsqueezy.com/buy/PRODUCT-ID-WEEKLY";
-
-/**
- * True while the links above are still placeholders.
- *
- * The UI uses this to keep the paid buttons visibly unavailable rather than
- * sending someone to a checkout that cannot complete. Derived, not hand-set,
- * so it cannot drift out of step with the links themselves.
- */
-export const CHECKOUT_CONFIGURED =
-  !CHECKOUT_LIFETIME_LINK.includes("PRODUCT-ID") &&
-  !CHECKOUT_WEEKLY_LINK.includes("PRODUCT-ID");

@@ -8,6 +8,8 @@
  * returned below and the views must preserve it.
  */
 
+import { PALACE_INTERPRETATIONS, APP_AUTHORED } from "./palace-interpretations.js";
+
 export const PALACE_SOURCE_REVIEW_NOTE =
   "Heritage interpretation withheld: the Twelve Palaces chapter body has not cleared source review.";
 
@@ -31,6 +33,11 @@ export const PALACES = Object.freeze(PALACE_LAYOUT.map((palace) => Object.freeze
   reading: null,
   heritageStatus: "WITHHELD_PENDING_SOURCE_REVIEW",
   sourceReviewNote: PALACE_SOURCE_REVIEW_NOTE,
+  // L-05: SpiritMaxx's own interpretation, carried beside -- never in place
+  // of -- the withheld heritage prose. `reading` stays null so no view can
+  // present app-authored text as the tradition's.
+  interpretation: PALACE_INTERPRETATIONS[palace.key] ?? null,
+  interpretationStatus: PALACE_INTERPRETATIONS[palace.key] ? APP_AUTHORED : null,
 })));
 
 export const SOURCES_DIFFER =

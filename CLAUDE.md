@@ -62,7 +62,9 @@ change the product's regulatory status, not just its tone.
 npm start        # dev server on http://localhost:5173 (honours PORT)
 npm test         # node:test suite
 npm run build    # dist/ — copy of src/, Module B stubbed in the entertainment flavour
-npm run lint:bundle   # compliance guards, run against dist/ not src/
+npm run lint:bundle   # compliance guards, run against dist/ not src/ (incl. the L-06 content gate)
+npm run test:falsify  # L-10: break each billing rule on purpose; every mutation must be caught
+node scripts/check-android.mjs <bubblewrap-dir>  # L-11: targetSdk >= 36, Play Billing on
 node scripts/qise-bakeoff.mjs --self-test   # Phase 5b decision table
 node scripts/engine-bench.mjs out.txt       # engine timings + measurement fingerprint
 ```
@@ -77,11 +79,11 @@ stubs when the flag is off.
 
 `package-lock.json` pins the declared dependencies for reproducible `npm ci` installs.
 
-1394 across 97 files, measured 6 September 2026 by running `npm test` directly rather than trusting
+1414 across 99 files, measured 23 September 2026 by running `npm test` directly rather than trusting
 this line — the exact commands and sub-counts age quickly as the suite grows, so verify with the
 runner rather than updating this sentence again.
 
-**All 1394 pass.** The long-standing `copy-guard` failure on
+**All 1414 pass.** The long-standing `copy-guard` failure on
 `TCM-202-DAMP-HEAT.recommend[1]` is resolved — that line moved to Module B in
 the Phase 2 split (see item 19). If a test fails, it is a real defect.
 
@@ -510,7 +512,7 @@ cache, which does not contain the new module.
 release that works perfectly on a fresh install.
 **Cause:** new entry in `SHELL`, unchanged `CACHE` name.
 
-Currently `mienshiang-v25` (bumped when frame-scheduler.js entered ui/qise/app.js's static import graph).
+Currently `mienshiang-v26` (bumped when the Play Billing modules, `ui/qise/paywall.js` and `reading/palace-interpretations.js` entered the static import graphs of `ui.js` and `ui/qise/app.js` — DR-2026-09-23-LAUNCH-V1).
 
 **The version is coupled to `index.html`, which is easy to miss.** The entry
 redirect is `location.replace("./qise.html?v=<n>")`, and `<n>` must equal the
@@ -822,39 +824,40 @@ inside an expression. `treat` was caught by the copy guard while writing this
 file, in its ordinary English sense, exactly as item 19 warns; it is now
 "regard".
 
-### 34. The unlock gate is soft, and saying so is the feature
+### 34. Paid access is whatever Google Play says NOW, and nothing on the device remembers it
 
-`shareGate.js` has three unlock states and no backend. Every one lives in
-localStorage, so anyone with devtools can grant themselves any of them, and the
-redeem URL can be shared by hand. **Nothing there is an entitlement; it is a
-courtesy latch.**
+**Superseded design, kept for its reasoning.** This item used to describe `shareGate.js`: a
+soft, localStorage "courtesy latch" with share-to-unlock, a weekly window and a redeem URL.
+Launch v1 (`DR-2026-09-23-LAUNCH-V1`, L-03/L-04) removed all of it. A latch was defensible
+while nothing was sold; once money changes hands, a flag anyone can set from devtools is a
+fake entitlement (`docs/agents/commerce-entitlements.md`).
 
-That is not a defect awaiting a fix — it follows directly from no-account,
-no-server, nothing-leaves-the-device. The only real fix is a server that
-verifies a receipt, which means an account, which is what the privacy posture
-exists to avoid. What follows:
+What replaced it, in `src/billing/`:
 
-- Nothing goes behind the gate that would be harmful to leak.
-- **Module B is never behind it** (`MODULE_B_IS_NEVER_MONETISED`). Safety
-  content is not paid content.
-- Do not add obfuscation that makes it look authoritative. A latch that
-  pretends to be a lock invites someone downstream to trust it.
+- **Entitlement is re-read from Play's `listPurchases()` on every render.** No flag, no
+  timestamp, no "last known good" in storage. A refund, revocation or lapsed subscription
+  locks the reading on the next open, because there is nothing to go stale.
+- **`unsupported` (no Digital Goods API: a plain browser) and `unverifiable` (the API exists,
+  Play did not answer) stay separate.** Both grant nothing. Only the second offers a retry, and
+  neither is ever reported as "not purchased".
+- **The payment response is not the entitlement.** `purchase()` grants only when a fresh
+  `listPurchases()` lists the item; otherwise it reports `pending`.
+- **`purchase()` refuses before the sheet opens while `ACKNOWLEDGEMENT_ROUTE` is null.** Play
+  refunds unacknowledged purchases after three days, and the Digital Goods API cannot
+  acknowledge without a backend (audit finding B-1). Taking money that is handed back 72 hours
+  later is worse than a paywall that says purchases are not open.
+- **The paywall is hard.** `gateIntegratedModel()` removes paid fields from the view model
+  before markup exists, and the classic view no longer renders paid sections under a blur.
+  "View source" was the old unlock.
+- **Module B is never paid** (`MODULE_B_IS_NEVER_MONETISED`). `hasFeature()` treats anything
+  not in `PAID_FEATURES` as free, so a safety surface cannot become gated by being forgotten.
 
-Two failure directions were chosen deliberately: a subscription whose expiry is
-missing or unparseable **fails closed**, and expiry **clears** the stored state
-rather than being recomputed each read — otherwise a lapsed week reopens by
-moving a clock the user controls.
-
-**Pinned by:** `a weekly window is open inside its term and shut after it`
-(asserts the exact boundary instant), `a subscription with a missing or corrupt
-expiry fails CLOSED`, and `expiry clears the stored state rather than leaving it
-to be re-read`.
-
-The checkout host is allowlisted with a pattern anchored at both ends whose path
-segment cannot contain `?` or `#`. A checkout URL is the one place it would feel
-natural to append context, and any such value would be face-derived data handed
-to a third party in a URL the app invites the user to open. The regex makes that
-unrepresentable rather than merely discouraged.
+**Symptom:** a reading that stays unlocked after a refund; paid prose findable in the DOM of a
+locked page; a purchase that "succeeds" and vanishes three days later.
+**Pinned by:** `tests/billing.test.js`, and by `scripts/billing-falsify.mjs`
+(`npm run test:falsify`). The script breaks each of these properties on purpose and requires
+the named test to go red. L-10 makes this falsification-first standard mandatory for billing.
+If you add a billing rule, add its mutation.
 
 ### 35. The share card is the most public surface, and it drops rather than trims
 
@@ -888,27 +891,12 @@ directions: as a literal it fails with
 and injected from the marked template all four guards pass. Same arrangement as
 the summary caveat (item 24) — one wording, two consumers.
 
-### 36. The dev panel expires the model that ships
+### 36. The dev panel hands out nothing
 
-`forceExpireSubscription()` moves the stored **expiry** into the past. The brief
-specified winding a `subscriptionStart` back by eight days, which describes a
-different model from the one in `shareGate.js`: this stores an absolute expiry,
-not a start plus a duration.
-
-The difference is the point. With a start time, "expired" is recomputed on every
-read from a clock the device owns, so a lapsed week reopens the moment the
-system date moves — which is why item 34 stores the expiry and clears it on
-lapse. A test harness that fakes a start time would be exercising a model the
-app does not have.
-
-`console.warn` on open is deliberate and survives minification: the panel hands
-out every unlock state for free, so the one thing that must not happen is it
-shipping unnoticed.
-
-**Pinned by:** `dev: force-expire lapses a live subscription and only a live
-one` and `dev: the three grants are mutually exclusive, last one wins` — the
-second guards a stale expiry following the state that replaced it, which would
-give a lifetime unlock someone else's deadline.
+**Superseded.** The 7-tap dev panel used to grant every unlock state and force-expire a weekly
+subscription. With real purchases, that panel would have shipped a free unlock to every user.
+It now only resets consent on the device. Test purchases go through Play's licence testers,
+never through a local grant (`DR-2026-09-23-LAUNCH-V1`).
 
 ### 37. A rank test is degenerate on a flat region
 
