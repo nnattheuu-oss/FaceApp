@@ -1,5 +1,7 @@
 /* Pure policy for the on-device selfie fallback. Decoding stays in the UI. */
 
+import { captureInstruction } from "./gates.js";
+
 export const MAX_SELFIE_BYTES = 15 * 1024 * 1024;
 export const MAX_SELFIE_EDGE = 2048;
 export const MIN_SELFIE_EDGE = 480;
@@ -58,4 +60,14 @@ export function drawSelfie(ctx, source, width, height, { mirrored } = {}) {
   }
   ctx.drawImage(source, 0, 0, width, height);
   if (mirrored) ctx.setTransform(1, 0, 0, 1, 0, 0);
+}
+
+/**
+ * The one line a refused selfie shows. Routed through captureInstruction, as
+ * the live path is, never `failures[0].message`: a BLOCKED gate sorts first
+ * at margin -1, so the raw first message names a cause nobody measured
+ * (CLAUDE.md item 54; M1a row 23).
+ */
+export function selfieGateMessage(report) {
+  return captureInstruction(report).title;
 }

@@ -33,7 +33,7 @@ import { BurstController, createMonotonicTimestamps } from "../../qise/capture-i
 import { createFrameScheduler } from "../../qise/frame-scheduler.js";
 import { faceGuideRect } from "../../qise/frame-geometry.js";
 import {
-  fitSelfieDimensions, validateSelfieDimensions, validateSelfieFile, drawSelfie,
+  fitSelfieDimensions, validateSelfieDimensions, validateSelfieFile, drawSelfie, selfieGateMessage,
 } from "../../qise/upload.js";
 import { readRois } from "../../qise/rois.js";
 import { headPose } from "../../qise/pose.js";
@@ -993,7 +993,7 @@ async function runSelfie(file) {
     );
     renderCaptureGuide(gates);
     if (!gates.pass) {
-      $("gate-line").textContent = gates.failures[0].message;
+      $("gate-line").textContent = selfieGateMessage(gates);
       $("selfie-status").textContent = "Choose another selfie using the shot guide. This photo was discarded.";
       discardSelfieScratch();
       return;
