@@ -457,6 +457,26 @@ Per device class:
 - **Bad light** → abstention or the honest reduced-confidence note.
 - **Deep skin in dim light:** capture success rate recorded separately per tone band (`rois.js` fairness note). A tone-band gap above 15 points blocks the gate.
 
+**Device-matrix additions from M1a (owner directive, 25 September 2026).**
+
+`e2e/beta-camera-integration.spec.js` holds the only four automated tests that drive the real camera → MediaPipe → gate pipeline. They run in CI's `browser` job (`npm run test:browser`) and passed 4/4 in the M1a session. But their fixture (`tests/fixtures/synthetic-face.y4m`) is a skin-toned ellipse, and MediaPipe finds no face in it. So the **face-dependent half of each test has never been executed by anything**. Each row below must be run on every device class above, on the Capacitor debug build:
+
+| Automated test (what it proves on the ellipse) | Never executed; run on device |
+|---|---|
+| `synthetic camera feed genuinely attaches and MediaPipe initialises`: the stream attaches, the WASM runtime starts | MediaPipe returns a 478-point mesh for a real face, on the GPU delegate and on the CPU fallback |
+| `gates evaluate real frames: gate line settles on a genuine face-detection instruction`: the gate line shows a real instruction; no reading appears | Gates move from red to green on a real face; the 650 ms hold completes; the 9-frame burst completes; a reading renders |
+| `media stream termination: camera stops cleanly when capture ends or user aborts`: a reload drops the stream | The camera light goes off after a finished reading, after "Restart camera", and after backgrounding. After backgrounding, the capture restarts by itself (M1a fix c) |
+| `gate feedback renders consistently as synthetic frames are processed`: the instruction never blanks | The instruction tracks real pose, distance and light changes on a real face, with no stalls or blank frames |
+
+Plus the M1a fixes that no browser fixture can reach:
+- **Two people in frame:** refused every time (fix a).
+- **Face leaves and returns mid-hold or mid-burst:** no reading completes without a fresh hold (fix b).
+- **Offline after an app update:** the scan still works (fix d: vendor precache).
+- **Airplane mode on first scan:** the model-load copy is shown, not the camera-permission copy (fix d).
+- **"Use this light anyway" under strongly coloured light:** it is not offered (fix e).
+- **Mirrored selfie from a phone that saves mirrored:** with the toggle on, cheeks keep their sides (fix f).
+- **Boot:** consent granted, app closed before the first reading, app reopened → the camera starts by itself (boot fix).
+
 **M2 detail.**
 - **4.3(b) defence:**
   - Position it as "Chinese face reading and face-colour journal".

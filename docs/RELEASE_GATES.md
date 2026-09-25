@@ -10,6 +10,8 @@
 
 As of 25 September 2026 the owner has never run this app. No manual run of the scanner, the boot flow, the paywall or the readings has happened, on any device. No gate in this file, or in `docs/STORE_RELEASE_GATES.md`, may be marked green on automated evidence alone.
 
+The M1 release-gate device matrix is in `docs/MONETISATION_AUDIT_2026-09.md` ("Release gate — device matrix"). It includes the face-dependent half of the four `e2e/beta-camera-integration.spec.js` tests, which no automated run has ever executed: their fixture contains no face. Gate 0 is separate from that matrix and is not satisfied by it.
+
 ---
 
 ## GATE 1 — FULL PRODUCT (the target)
