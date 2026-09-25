@@ -29,7 +29,7 @@ this record did not resolve: `docs/LAUNCH_V1_AUDIT.md`.
 - **No weekly plan. No free trial. No introductory offers in v1.**
 - **13 weeks → 3 months.** Play base plans use standard periods; a 13-week period is not expected to be available. Uncertain: confirm in Play Console when creating the base plan; if "3 months" is offered, use it. All copy says "every 3 months", never "13 weeks" or "each season" alone.
 - Prices shown in-app are read from Play (localised per country), never hard-coded.
-- Paywall: **hard**, placed after scan + Three Courts + Qi Se baseline (free), before full trait mapping + Twelve Palaces (paid).
+- Paywall: **hard**, placed after scan + Three Courts + Qi Se baseline (free), before full trait mapping + Twelve Palaces (paid). _[Editorial note, 25 Sep 2026: "Three Courts" is recorded verbatim; the construct's name is **Three Sections** per R1 of DR-2026-08-17-B020-CLASS-A, and the UI says Three Sections.]_
 
 ## L-04 Sharing
 - v1 ships "Share your reading card" (Web Share API; download fallback).

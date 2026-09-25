@@ -13,6 +13,7 @@ Before changing the product, read:
 7. `docs/scanner-development-report.md` for the scanner's evidence and remaining limitations.
 8. For approved daily-loop work, `docs/OPTION_B_PROGRAM.md`, `docs/OPTION_B_EXECUTION_PLAN.md` and `docs/agents/daily-loop-program-architect.md`.
 9. Before changing any user-facing visual experience, `docs/VISUAL_DIRECTION.md`.
+10. For anything touching money, the store build, privacy egress or the paywall, `docs/MONETISATION_AUDIT_2026-09.md` (its frozen contracts bind every agent).
 
 ## Non-negotiable workflow
 
@@ -25,6 +26,15 @@ Before changing the product, read:
 - The product is entertainment and self-discovery, not diagnosis, identity, attractiveness scoring, prediction or a fixed judgement of character.
 - When evidence is missing, abstain or set `needsVerification: true`; never fabricate a MediaPipe index, classical claim, legal conclusion or commercial decision.
 - For Option B, programme approval is not signal approval. Follow the execution queue in dependency order; no new transient signal becomes persistent, eligible or user-facing before its contract and independent proof verdict pass.
+
+## Branch discipline (DR-2026-09-25-M0-CONSOLIDATION)
+
+The repository once carried 50+ parallel agent branches; M0 triaged every one. To keep it from recurring:
+
+- **One active branch per workstream**, named for the milestone it serves (`m1a/*`, `m1b/*`, `m1c/*`, `m2/*`, `m3/*`, `docs/*`).
+- Branches stack on `main` or on the current release PR, **never more than two layers deep**. A third layer waits until the first merges.
+- **Every PR body names the DR entry or milestone that authorises it.** A branch with no authorising record is not opened.
+- A branch that stops being worked is merged, or superseded with a note naming what absorbed it, then archived as a tag `archive/<name>` before the branch is deleted. Nothing is deleted silently.
 
 ## Required handoff
 

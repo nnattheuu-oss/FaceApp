@@ -2,6 +2,8 @@
 
 COST CONTROL: Claude is the repository's research/review specialist, not the default implementation worker. Before beginning work, classify the task. If the specification is already settled and the remaining work is primarily mechanical implementation, testing, repository administration, or repetitive toil, STOP and hand execution to Gemini 2.5 Flash.
 
+**Owner-directed exception (DR-2026-09-25-M0-CONSOLIDATION).** When the product owner explicitly directs a Claude session to execute a milestone end to end (for example the 25 September 2026 monetisation programme: M0, D1–D6, M1a/b/c), Claude executes it and does not hand off. The hand-off rule above still governs every task the owner has not directed in that way. The context-hygiene rules below apply either way.
+
 ## AI Context / Cost Control — Mandatory
 
 See `docs/AI_CONTEXT_BUDGET.md` for full policy details.
@@ -118,10 +120,21 @@ without a phone live in `docs/QISE_NOTES.md`. Read that before touching it.
 
 ## Architecture
 
+**Which app is which (refreshed in M0, 25 Sep 2026).** The product people use
+is the Qi Se tracker: `src/qise.html` + `src/ui/qise/app.js`. `src/index.html`
+redirects there unless the URL carries `?classic`; the classic flow
+(`index.html?classic` → `ui.js` → `analysis.js`, including Module B, the
+science screen and the old share gate) is an escape hatch that the store
+artefact excludes (proposed DR-2026-09-25-STORE-ARTEFACT-SCOPE). `src/beta/` is
+a research bench. Commerce lives in `src/billing/` + `src/ui/qise/paywall.js`
+(DR-2026-09-23-LAUNCH-V1; entitlement provider moves to RevenueCat under
+DR-2026-09-25-DUAL-STORE-REVENUECAT). The monetisation programme and its
+milestones are in `docs/MONETISATION_AUDIT_2026-09.md`.
+
 ```
 src/
-  index.html    UI + all styles (single file, no framework)
-  ui.js         screen wiring, overlay rendering, consent gate
+  index.html    CLASSIC UI + styles; redirects to qise.html unless ?classic
+  ui.js         CLASSIC screen wiring, overlay rendering, consent gate
   analysis.js   MediaPipe landmarking, ROI hull masking, orchestration
   flags.js      build flavour: does Module B ship? (ASCII-only, see item 17)
   zones.js      ROI geometry — measurement config, owned by neither module
@@ -152,7 +165,11 @@ src/
     insights.js           MODULE A shape narrative; teaser free, report gated
     textureAnalyzer.js    oriented GLCM, robust statistics  ← pure, same
   rules.js      facial zone definitions + forward-chaining rule engine
-  sw.js         offline cache (app shell + WASM + model)
+  sw.js         offline cache (app shell; vendored WASM + model cached on first fetch)
+  billing/      catalogue.js entitlements.js offers.js purchase.js — the entitlement
+                model; provider layer is Play Digital Goods today, RevenueCat from M1c
+  heritage/     source registry, evidence, resolver, composition (fail-closed)
+  beta/         research bench surface; excluded from the store artefact
   manifest.webmanifest   PWA metadata; must be served as application/manifest+json
   icon-192.png           install icon (purpose: any)
   icon-512.png           install icon (purpose: any)
@@ -172,11 +189,19 @@ src/
     store.js      IndexedDB; toRecord() is a pure allow-list (item 39)
     passages.js   attributed passage corpus, composed from three keyed parts
     patterns.js   frequency-only statements, n >= 5, n always shown
+    frame-scheduler.js  distinct decoded frames only (rVFC, rAF fallback)
+    capture-runtime.js  screen-assist guard, refocus, stall tracking
+    reading-*.js reflection*.js  the Reflection Engine (public default: see
+                  DR-2026-08-17-REFLECTION-ENGINE-INTERNAL-DEFAULT)
   ui/qise/      the tracker's view layer — pure models, string renderers
     palette.js    five colours + Su Wen similes; emits the CSS custom properties
     seal.js       the compass as a carved seal, seeded from the timestamp
     screens.js    reading-screen order, gauges, courts strip, sparkline
     app.js        DOM wiring ONLY; MediaPipe is a dynamic import (item 41)
+    paywall.js    hard paywall: paid content removed from the model, not blurred
+    share.js      Qi Se share cards (no face photo, no raw measurements)
+  reading/palace-interpretations.js  L-05 app-authored text, used only where
+                  the project's sources dispute a palace (Wealth, Property)
 scripts/
   serve.js      local dev server ONLY — never deployed
   run-tests.js  test discovery; exits 1 on zero files found
@@ -219,8 +244,9 @@ photo → canvas → un-mirror → Shades-of-Gray white balance (WHOLE FRAME, ON
       → observation facts → forward-chaining rules → referrals + advice
 ```
 
-MediaPipe (`@mediapipe/tasks-vision@0.10.18`) and the 3.76 MB face model load
-from CDN and are cached by the service worker for offline use.
+MediaPipe (`@mediapipe/tasks-vision@0.10.18`) and the face model are
+**vendored same-origin** by `scripts/build.js` (hash-pinned) and cached by the
+service worker on first fetch. Nothing loads from a CDN.
 
 ---
 

@@ -68,7 +68,7 @@ interpretation. **One of them has never been able to run.**
   model contains no auricle geometry: no helix, antihelix, tragus, concha or
   lobule vertex, and only ten of its 468 vertices sit posterior to z = −1.5. The
   gate cannot be evaluated from a front-facing capture and never could.
-  `src/engine.js:227` already recorded `diagonal_crease: "needs an ear detector;
+  `src/engine.js` (`UNAVAILABLE.diagonal_crease`) already recorded `diagonal_crease: "needs an ear detector;
   the face mesh has no earlobe points"`. Reinstating it requires a separate ear
   detector, a separate capture pose, its own consent and its own failure mode —
   a project, not a fix.

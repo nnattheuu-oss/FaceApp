@@ -166,7 +166,7 @@ and a legal view, and neither substitutes for the other.
 
 - **Recommended:** **withdraw from v1** and amend the project charter.
 - **Product consequence:** the charter currently names a critical safety gate that has never been able to run.
-- **Corpus/code consequence:** charter text. `src/engine.js:227` already records `diagonal_crease: "needs an ear detector; the face mesh has no earlobe points"` — the codebase knew before the dossier did.
+- **Corpus/code consequence:** charter text. `src/engine.js` (`UNAVAILABLE.diagonal_crease`) already records `diagonal_crease: "needs an ear detector; the face mesh has no earlobe points"` — the codebase knew before the dossier did.
 - **Evidence:** dossier §7, verified against MediaPipe's `canonical_face_model.obj`: 468 vertices, no helix, antihelix, tragus, concha or lobule. Only 10 vertices sit posterior to z = −1.5.
 - **Risk if accepted:** the charter's safety-gate claim is reduced to one gate.
 - **Risk if rejected:** we keep a written commitment to a control that cannot be built from the current capture, which is worse than not having it.

@@ -165,7 +165,7 @@ Use this register to stop prompts, discussions and implementation from collapsin
 | R11 | The **fourteen prohibited inferences** in `OPTION_B_020_DOSSIER.md` §10.2 are absolute product constraints, pending legal confirmation where marked. |
 | R12 | Safety-gate copy is **completely non-specific** and never names a clinical finding, pending legal confirmation. |
 | R13 | **假神 is removed** from the rule system. Gate precedence is enforced programmatically with negative tests, not by convention. |
-| R14 | The **diagonal-earlobe-crease gate is withdrawn from v1** and the charter is amended. The MediaPipe canonical mesh contains no auricle geometry; `src/engine.js:227` already recorded this. |
+| R14 | The **diagonal-earlobe-crease gate is withdrawn from v1** and the charter is amended. The MediaPipe canonical mesh contains no auricle geometry; `src/engine.js` (`UNAVAILABLE.diagonal_crease`) already recorded this. |
 
 - **Evidence:** `docs/OPTION_B_020_DOSSIER.md` and `docs/OPTION_B_020_DISPOSITIONS.md`, which carry the source, the consequence and the risk both ways for each row.
 - **Consequences:** these are decisions, not recommendations. Corpus and code may be changed to match without further approval. They do **not** approve any heritage family for commercial release — all six remain `Blocked` in `docs/commercial-rights-audit.md`.
@@ -703,6 +703,25 @@ Use this register to stop prompts, discussions and implementation from collapsin
   only effect is to make the exclusion a recorded decision rather than a silent gap, so a future
   pass does not mistake "not mentioned" for "cleared."
 - **Supersedes:** nothing.
+
+### DR-2026-09-25-M0-CONSOLIDATION
+
+- **Status:** approved by the product owner, 25 September 2026 (consolidated monetisation directive, Part II); implemented in the M0 PR.
+- **Decision:** one consolidated base for all further work, with every parallel branch resolved once.
+  1. **Base stack:** PR #1 head `ed722e6` + `claude/consolidation-phase15-multiview-decision` + launch-v1 `73995fd` + `claude/immersive-capture-screen` + `claude/mien-shiang-architecture-agxp7l-hardening-review`.
+  2. **Palace reconciliation.** Ten palaces keep tradition-attributed prose (`DR-2026-09-09-R8-TWELVE-PALACES-RESTORED`). Wealth and Property, whose placement the project's own sources dispute, carry the L-05 app-authored interpretation instead (`DR-2026-09-23-LAUNCH-V1`). Heritage prose and app-authored text never share a palace. The rule is pinned in `tests/launch-content-gate.test.js`.
+  3. **Capture screen.** `immersive-capture-screen` is merged: its guide is derived from `faceGuideRect()` (CLAUDE.md item 57). `vibe/fullscreen-camera-fix` is superseded; its precache moves to M1a.
+  4. **Every other remote branch** is classified in `docs/BRANCH_TRIAGE_2026-09-25.md`. Archive tags are pushed before any delete, and deletions run only after PR #1 and the M0 PR reach `main`.
+  5. **Branch discipline** (written into `AGENTS.md`): one active branch per workstream, at most two stacked layers, and every PR names its authorising DR or milestone.
+  6. **Owner-directed execution exception** to the CLAUDE.md hand-off-to-Gemini rule (`CLAUDE.md` line 5).
+  7. **Housekeeping:**
+     - `DR-2026-08-17-SU-WEN-EDITION` was cited in `src/reading/provenance.js` but never registered; the edition decision is recorded in that entry itself.
+     - Stale `src/engine.js:227` references are now symbolic (`UNAVAILABLE.diagonal_crease`).
+     - `scripts/check-android.mjs` repointed from the archived `DEPLOY.md`.
+     - Pages path updated to `FaceApp`.
+     - The README test count is corrected.
+- **Evidence:** `node scripts/run-tests.js` → 1428 pass / 0 fail on the M0 head; `npm run build`; `npm run lint:bundle`; `node scripts/billing-falsify.mjs` (13/13 caught).
+- **Supersedes:** nothing substantive. It records the integration of already-approved work.
 
 ## Unresolved proposals
 

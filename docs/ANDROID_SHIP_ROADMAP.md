@@ -189,7 +189,7 @@ GitHub Pages *project* site.** Digital Asset Links must be served from the
 origin **root** (`https://<host>/.well-known/assetlinks.json`). Netlify
 (`yoursite.netlify.app`) and Cloudflare Pages (`yourproject.pages.dev`) each
 give you the root of that subdomain. A GitHub Pages project site
-(`username.github.io/mien-shiang/`) has its origin root — `username.github.io`
+(`username.github.io/FaceApp/`) has its origin root — `username.github.io`
 — served by a *different* repository you don't control from here, so
 `assetlinks.json` cannot be placed for it and TWA verification cannot pass,
 unless you also own that user-site repo or attach a custom domain. **Publish

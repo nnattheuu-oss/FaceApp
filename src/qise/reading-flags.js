@@ -21,7 +21,7 @@ export const REFLECTION_MODES = Object.freeze(["off", "on", "compare"]);
  *
  * Development should proceed against the engine we intend to keep, not the one
  * we intend to replace. But the heritage layer paraphrases sources whose
- * commercial rights are recorded as Blocked in `commercial-rights-audit.md`,
+ * commercial rights are recorded as Blocked in `docs/commercial-rights-audit.md`,
  * so "on by default" must not be able to reach a public user by accident.
  *
  * The split is by HOST rather than by a build flag, and that is deliberate. A

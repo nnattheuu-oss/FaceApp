@@ -18,7 +18,8 @@
  *
  * It deliberately does NOT check the signing key, the package ID's value or
  * assetlinks.json -- those are owner-held (L-11: the owner holds the upload
- * key) and DEPLOY.md covers them.
+ * key) and docs/ANDROID_SHIP_ROADMAP.md "Deployment detail" (merged from the
+ * archived DEPLOY.md) covers them.
  */
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";

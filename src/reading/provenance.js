@@ -140,7 +140,10 @@ function sourceRecord(value) {
 
 const RAW_SOURCE_REGISTRY = {
   /*
-   * RESOLVED 17 August 2026 — DR-2026-08-17-SU-WEN-EDITION.
+   * RESOLVED 17 August 2026. This was labelled DR-2026-08-17-SU-WEN-EDITION,
+   * but no register entry by that ID was ever written; the edition decision
+   * lives in this entry itself and in DR-2026-09-25-M0-CONSOLIDATION's
+   * housekeeping record (docs/DECISION_REGISTER.md).
    *
    * The audit's recorded defect was "the Su Wen chapter reference has no
    * recorded edition or translation", and this entry carried the defect in its
