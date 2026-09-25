@@ -57,7 +57,7 @@ test("without a Play purchase, paid content is absent from the DOM and the free 
   expect(errors).toEqual([]);
 });
 
-test("with the lifetime purchase listed by Play, the palaces open with the L-05 label", async ({ page }) => {
+test("with the lifetime purchase listed by Play, tradition palaces open on heritage prose and disputed ones on the L-05 label", async ({ page }) => {
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   await page.addInitScript(() => {
@@ -79,12 +79,18 @@ test("with the lifetime purchase listed by Play, the palaces open with the L-05 
   expect(await story.innerHTML()).toContain('<p class="eyebrow">Five Elements</p>');
   expect(await story.locator(".palace-card").count()).toBe(12);
 
-  // Open one palace: the app-authored interpretation, its question and the label.
+  // M0 reconciliation (DR-2026-09-25-M0-CONSOLIDATION): a tradition palace
+  // opens on its attributed heritage reading, with no app-authored label...
   await story.locator(".palace-card[data-palace='life'] .palace-enter").click();
   const life = story.locator(".palace-card[data-palace='life'] .palace-reveal");
-  await expect(life).toContainText("threshold rather than a verdict");
-  await expect(life).toContainText(LABEL);
-  await expect(life).toContainText("not read from your face");
+  await expect(life).toContainText("Taiqing Shenjian");
+  await expect(life).not.toContainText("not read from your face");
+  // ...and a source-disputed palace opens on the L-05 interpretation and the
+  // label, so no paid palace is an empty box.
+  await story.locator(".palace-card[data-palace='wealth'] .palace-enter").click();
+  const wealth = story.locator(".palace-card[data-palace='wealth'] .palace-reveal");
+  await expect(wealth).toContainText(LABEL);
+  await expect(wealth).toContainText("not read from your face");
   await expect(page.locator("#today-palaces")).toHaveText("Enter 12 palaces");
   expect(errors).toEqual([]);
 });
