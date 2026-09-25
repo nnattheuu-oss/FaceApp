@@ -576,6 +576,7 @@ export function releaseCapture(scratch) {
   const released = {
     images: 0, landmarkArrays: 0, canvasCleared: false, tracksStopped: 0,
     landmarkerClosed: false, previewCleared: false, wakeLockReleased: false,
+    lifecycleDisposed: false,
   };
   if (!scratch) return released;
 
@@ -616,6 +617,12 @@ export function releaseCapture(scratch) {
   // Deliberately NOT awaited: this function is synchronous by contract, and
   // release() resolves rather than rejecting (it logs its own failures), so
   // there is no rejection to strand.
+  // The lifecycle watcher (qise/capture-lifecycle.js) goes with the capture
+  // it watches, on every way out, so a dead capture never restarts itself.
+  if (scratch.lifecycle && typeof scratch.lifecycle.dispose === "function") {
+    scratch.lifecycle.dispose();
+    released.lifecycleDisposed = true;
+  }
   if (scratch.wakeLock && typeof scratch.wakeLock.release === "function") {
     scratch.wakeLock.release();
     released.wakeLockReleased = true;
@@ -628,5 +635,6 @@ export function releaseCapture(scratch) {
   scratch.landmarker = null;
   scratch.video = null;
   scratch.wakeLock = null;
+  scratch.lifecycle = null;
   return released;
 }

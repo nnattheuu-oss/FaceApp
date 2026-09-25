@@ -44,6 +44,7 @@ import {
   illuminationFrameStable, illuminationInterruption, abandonedIlluminationSummary,
 } from "../../qise/illumination.js";
 import { createScreenWakeLock } from "../../qise/wakelock.js";
+import { watchCaptureLifecycle } from "../../qise/capture-lifecycle.js";
 import {
   evaluateGates, captureGuide, captureInstruction, canUseCurrentLight, DISTANCE_MIN_FRACTION,
 } from "../../qise/gates.js";
@@ -362,9 +363,24 @@ async function runCapture() {
     documentRef: document,
   });
   wakeLock.acquire();
+  // If the OS takes the camera away (backgrounding, a call, a revoked
+  // permission) the loop would otherwise freeze on its last prompt. Restart
+  // the capture instead — once, and only for THIS run (M1a fix (c)).
+  const lifecycle = watchCaptureLifecycle({
+    documentRef: document,
+    track: opened.track,
+    onRecover: (reason) => {
+      if (runId !== captureRun) return;
+      console.warn("qise: camera lost, restarting the capture", reason);
+      runCapture().catch((error) => {
+        console.error("qise: capture restart failed", error);
+        $("gate-line").textContent = describeCameraError(error);
+      });
+    },
+  });
   scratch = {
     canvas, images: [], landmarks: [], stream: opened.stream, landmarker, video,
-    wakeLock,
+    wakeLock, lifecycle,
   };
 
   // ── EXPOSURE SETTLES BEFORE THE BURST CAN ARM ─────────────────────────────

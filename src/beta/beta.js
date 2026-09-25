@@ -48,6 +48,7 @@ import {
 } from "../qise/gates.js";
 import { frameStats } from "../qise/framestats.js";
 import { createScreenWakeLock } from "../qise/wakelock.js";
+import { watchCaptureLifecycle } from "../qise/capture-lifecycle.js";
 import {
   createExposureHalo, haloStateFromCapture, shouldUseScreenFlash, shouldDropScreenFlash,
 } from "../ui/qise/exposure-halo.js";
@@ -443,8 +444,24 @@ async function runCapture() {
   // phone awake, and released by releaseCapture() on every way out.
   const wakeLock = createScreenWakeLock({ wakeLock: navigator.wakeLock, documentRef: document });
   wakeLock.acquire();
+  // Restart once if the OS takes the camera away mid-capture, instead of
+  // freezing on the last prompt (M1a fix (c), qise/capture-lifecycle.js).
+  const lifecycle = watchCaptureLifecycle({
+    documentRef: document,
+    track: opened.track,
+    onRecover: (reason) => {
+      if (runId !== captureRun) return;
+      console.warn("beta: camera lost, restarting the capture", reason);
+      runCapture().catch((error) => {
+        console.error("beta: capture restart failed", error);
+        $("gate-line").textContent = describeCameraError(error);
+        resetCaptureButton();
+      });
+    },
+  });
   scratch = {
     canvas, images: [], landmarks: [], stream: opened.stream, landmarker, video, wakeLock,
+    lifecycle,
   };
 
   let captureMode = "auto";
