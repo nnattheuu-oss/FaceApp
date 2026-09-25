@@ -283,7 +283,7 @@ well-attested the underlying scholarship now is.
 
 ## CARD 9 — Analytics boundary — DELIBERATELY NOT RESOLVED, see `DR-2026-09-09-CARDS-6-9-11-NOT-RESOLVED`
 
-> **Proposed resolution (25 Sep 2026): DR-2026-09-25-ANALYTICS-CARD-9.** This is awaiting owner approval, per this card's own rule that analytics is the owner's call. The proposal: no first-party telemetry at M1, with the funnel taken from Play Console and RevenueCat. The fallback is six day-bucketed, identifier-free counters, and it needs separate approval. See `docs/MONETISATION_AUDIT_2026-09.md` D4 §6.
+> **Resolved (25 Sep 2026): DR-2026-09-25-ANALYTICS-CARD-9, approved by the owner (`DR-2026-09-25-SIX-PROPOSALS-APPROVED`).** The proposal: no first-party telemetry at M1, with the funnel taken from Play Console and RevenueCat. The fallback is six day-bucketed, identifier-free counters, and it needs separate approval. See `docs/MONETISATION_AUDIT_2026-09.md` D4 §6.
 
 **The question.** Should any event in `docs/SECURITY_PRIVACY_THREAT_MODEL.md`'s named-but-
 unimplemented aggregate-telemetry taxonomy actually be implemented?

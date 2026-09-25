@@ -762,39 +762,40 @@ Use this register to stop prompts, discussions and implementation from collapsin
 - **Still prohibited** (the retention contract's list otherwise stands): streak-loss framing, fear-based urgency, fake or resetting countdowns, loot boxes, fabricated scarcity, shame or guilt for a missed day.
 - **Supersedes:** L-08's "No streaks" line, and the retention contract's no-notification direction (`docs/RETENTION_EXPERIENCE_CONTRACT.md`, "No-notification direction is preserved"), which that contract says needs exactly this kind of register decision to reopen.
 
+### DR-2026-09-25-SIX-PROPOSALS-APPROVED
+
+- **Status:** approved by the product owner, 25 September 2026. The authority is the owner directive of that date ("all six proposed DRs APPROVED, effective now"), relayed in the session that executed M0/M1a. Each entry below was recorded as `proposed` in the M0 PR (`docs/MONETISATION_AUDIT_2026-09.md` D6 item 6) and is now approved **as written here**. Where the owner narrowed a proposal, the narrower text governs.
+- **DR-2026-09-25-CATALOGUE-PRICING (approved, structure only).**
+  - Approved structure:
+    - the no-trial launch arm;
+    - an annual "Full Reading" subscription as the primary product;
+    - "Ask the Mirror" consumable credit packs, first answer free, deterministic with no LLM and $0 inference;
+    - two-face compatibility as a one-shot product.
+  - **No specific price point is approved.** The A$/US$ figures in the audit (D4 §1) stay proposals pending the D4 lock, and no store product may be created with a price until the owner approves one.
+  - The trial A/B (7-day arm after 500 paywall views) remains a planned experiment, not a settled fact.
+  - No lifetime product at launch. No weekly plan.
+- **DR-2026-09-25-STORE-ARTEFACT-SCOPE (approved).**
+  - Store builds exclude the classic path, `/beta/` and Module B (`MODULE_B_SAFETY_REFERRALS=false`), by build flag rather than deletion.
+  - `MODULE_B_IS_NEVER_MONETISED` stays.
+  - `src/terms.html`'s false "science screen one tap from every reading" claim is corrected.
+  - Implemented in M1b. Resolves v1 B-5/B-6.
+- **DR-2026-09-25-REFLECTION-PUBLIC-DEFAULT (approved).**
+  - The Reflection Engine's public default is ON.
+  - Supersedes `DR-2026-08-17-REFLECTION-ENGINE-INTERNAL-DEFAULT` and resolves v1 STOP-1.
+  - The production origin is added **by name** to `src/qise/reading-flags.js`'s allowlist (M1b), never by defaulting every host on.
+- **DR-2026-09-25-RELEASE-CHECK-L05 (approved).** `scripts/check-release.js` treats provenance families presented under the L-05 label as non-blocking. `auditContentProvenance` remains as a report. Implemented in M1b.
+- **DR-2026-09-25-ANALYTICS-CARD-9 (approved, per audit D4 §6).**
+  - Resolves Card 9 and supersedes `docs/ZKT_TELEMETRY_SCOPE.md`.
+  - No first-party telemetry at M1; funnel data comes from Play Console and RevenueCat.
+  - The six-counter fallback still needs its own approval before it is built.
+- **DR-2026-09-25-COMPAT-REMOTE-FIRST (approved).**
+  - Two-face compatibility is remote-first: each person scans their own face on their own phone, only derived share tokens travel, and never a photo.
+  - The in-person path, **and the compatibility store listing**, are held until legal item L10 is resolved.
+- **Release gate unchanged by any of these:** Gate 0 in `docs/RELEASE_GATES.md` (the owner's personal real-device smoke test of merged `main`) still blocks every store submission.
+
 ## Unresolved proposals
 
 These must not be implemented as settled decisions without approval:
-
-### Proposed 25 September 2026 (monetisation audit). Owner approval required; each is listed in D6.
-
-- **DR-2026-09-25-CATALOGUE-PRICING (proposed).**
-  - Primary product: annual "Full Reading" at A$79.99 / US$49.99.
-  - Monthly A$14.99 as a price anchor.
-  - Two-face compatibility at A$9.99, included for annual subscribers.
-  - "Ask the Mirror" credits: first answer free, then 5 for A$4.99 or 20 for A$14.99. Deterministic, $0 inference.
-  - First-year discounted annual at A$49.99, offered only in the genuine 24-hour window.
-  - No lifetime product at launch. No weekly plan.
-  - Trial: the no-trial arm A at launch; the 7-day-trial arm B after 500 paywall views; decided by net revenue per paywall view.
-  - Source: `docs/MONETISATION_AUDIT_2026-09.md` D4 §1–2.
-- **DR-2026-09-25-STORE-ARTEFACT-SCOPE (proposed).**
-  - Store builds exclude the classic path, `/beta/` and Module B (`MODULE_B_SAFETY_REFERRALS=false`), by build flag rather than deletion, so the classic tests stay green.
-  - `MODULE_B_IS_NEVER_MONETISED` stays.
-  - `src/terms.html`'s false "science screen one tap from every reading" claim is corrected.
-  - Resolves v1 B-5/B-6 and the capture-screen triage row.
-- **DR-2026-09-25-REFLECTION-PUBLIC-DEFAULT (proposed).**
-  - Supersedes `DR-2026-08-17-REFLECTION-ENGINE-INTERNAL-DEFAULT` and resolves v1 STOP-1.
-  - That record's only stated gate was the heritage rights gates, which L-05 moved to research-track.
-  - The production origin is added **by name** to `src/qise/reading-flags.js`'s allowlist, never by defaulting on.
-- **DR-2026-09-25-RELEASE-CHECK-L05 (proposed).** `scripts/check-release.js` treats provenance families presented under the L-05 label as non-blocking. `auditContentProvenance` remains as a report.
-- **DR-2026-09-25-ANALYTICS-CARD-9 (proposed).** Resolves Card 9 and supersedes `docs/ZKT_TELEMETRY_SCOPE.md`:
-  - No first-party telemetry at M1. Funnel data comes from Play Console and RevenueCat.
-  - Fallback: six day-bucketed, identifier-free counters to a stateless worker, only if RevenueCat cannot report paywall views. The fallback needs its own approval.
-- **DR-2026-09-25-COMPAT-REMOTE-FIRST (proposed).**
-  - Two-face compatibility launches with **remote derived tokens only**: each person scans their own face on their own phone.
-  - The in-person (friend's face on your phone) path is held until legal item L10 is answered.
-  - Source: audit D4 §4.
-
 
 - A strict rolling 90-day TTL for derived IndexedDB history. Reconcile it with the existing baseline window, migration, user controls and deletion semantics first.
 - React/Vite migration. If approved, explicitly solve GitHub Pages base paths and MediaPipe WASM/asset resolution; this is not a current-stack bug.

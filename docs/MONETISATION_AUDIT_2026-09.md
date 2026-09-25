@@ -1,8 +1,7 @@
 # Monetisation audit and programme — September 2026
 
 Status: owner-approved programme (25 September 2026). Binding rulings are recorded in
-`docs/DECISION_REGISTER.md` as `DR-2026-09-25-*`. Where this document says **proposed**, the owner has
-not yet approved it (D6 lists every approval owed). Line references are against the M0 head unless noted.
+`docs/DECISION_REGISTER.md` as `DR-2026-09-25-*`. **All six entries this document calls "proposed" were approved on 25 September 2026** (`DR-2026-09-25-SIX-PROPOSALS-APPROVED`). The one narrowing: no price point is approved yet. Line references are against the M0 head unless noted.
 
 **Labels.** "Estimate:" marks a number with no primary source. "Contested:" marks sources that
 disagree. Everything else is cited.
@@ -521,13 +520,7 @@ Per device class:
    - Create the account and project.
    - Link the Play service-account credentials.
    - Create the products and base plans from D4 §1 in Play, and the offerings and entitlement `full` in RevenueCat.
-6. **Approve or reject the proposed DR entries:**
-   - CATALOGUE-PRICING
-   - STORE-ARTEFACT-SCOPE
-   - REFLECTION-PUBLIC-DEFAULT
-   - RELEASE-CHECK-L05
-   - ANALYTICS-CARD-9
-   - COMPAT-REMOTE-FIRST
+6. ~~Approve or reject the proposed DR entries~~ **Done, 25 Sep 2026:** all six are approved (`DR-2026-09-25-SIX-PROPOSALS-APPROVED`). CATALOGUE-PRICING is approved **as structure only; no price points are approved**, and those stay pending the D4 lock.
 7. **Buy a custom domain** and point the web funnel at it. App Links need `assetlinks.json` at the origin root; a GitHub Pages project site can't serve it.
 8. **Run the device matrix** on the M1c debug build with the closed testers. Include deep-skin participants in dim light, and log results against the gate criteria.
 9. **Confirm the EU posture** (recommended: stay excluded).
