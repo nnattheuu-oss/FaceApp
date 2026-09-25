@@ -33,7 +33,7 @@ https://<host>/.well-known/assetlinks.json
 
 - **Netlify** → `yoursite.netlify.app`, **Cloudflare Pages** → `yourproject.pages.dev`.
   You control the root of that subdomain, so `/.well-known/` is yours. Both work.
-- **GitHub Pages project site** → `username.github.io/mien-shiang/`. The origin
+- **GitHub Pages project site** → `username.github.io/FaceApp/`. The origin
   is `username.github.io`, whose root is served by a *different* repo
   (`username.github.io`). You cannot place `assetlinks.json` for it from this
   repo, so TWA verification cannot pass. Only usable if you also own that user

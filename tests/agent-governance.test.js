@@ -63,7 +63,7 @@ test("critical governance and release paths name the product owner", () => {
   for (const path of requiredPaths) {
     const line = source.split(/\r?\n/).find((entry) => entry.trimStart().startsWith(`${path} `));
     assert.ok(line, `CODEOWNERS must cover ${path}`);
-    assert.match(line, /@matthewcarlhogan-netizen\s*$/,
+    assert.match(line, /@nnattheuu-oss\s*$/,
       `${path} must be owned by the product owner`);
   }
 });

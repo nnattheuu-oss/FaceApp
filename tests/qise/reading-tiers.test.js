@@ -130,7 +130,7 @@ test("the published origin, and any origin at all, defaults to off", () => {
   // internal list. Checked by name so that adding it later fails here rather
   // than in front of users.
   for (const host of [
-    "matthewcarlhogan-netizen.github.io", "mienshiang.app", "example.com",
+    "nnattheuu-oss.github.io", "mienshiang.app", "example.com",
     "", undefined, "localhost.evil.com", "app.github.dev.attacker.net",
   ]) {
     assert.equal(reflectionMode({ hostname: host }), "off", `${host} must not be internal`);
@@ -140,7 +140,7 @@ test("the published origin, and any origin at all, defaults to off", () => {
 test("no internal pattern matches the release origin", () => {
   // The guard that keeps blocked heritage content off the public path.
   for (const re of INTERNAL_HOST_PATTERNS) {
-    assert.ok(!re.test("matthewcarlhogan-netizen.github.io"),
+    assert.ok(!re.test("nnattheuu-oss.github.io"),
       `pattern ${re} matches the published origin`);
   }
 });
