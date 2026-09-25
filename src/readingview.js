@@ -21,6 +21,7 @@
 import { READING_LEAD } from "./reading/index.js";
 import { buildSummary, SECTION_IDS } from "./reading/summary.js";
 import { generateInsights } from "./utils/insights.js";
+import { INTERPRETATION_LABEL, PALACE_BASIS_NOTE } from "./reading/palace-interpretations.js";
 
 export const esc = (s) => String(s).replace(/[&<>"]/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -165,7 +166,12 @@ function renderPalaces(tp, openDiffer) {
       <summary>${esc(p.name)}
         <span class="muted small">— ${esc(p.location)}</span>
         ${p.measured ? "" : `<span class="tag">not read</span>`}</summary>
-      ${p.reading ? `<p>${esc(p.reading)}</p>` : ""}
+      ${p.reading ? `<p>${esc(p.reading)}</p>` : p.interpretation
+        ? `<p>${esc(p.interpretation.lens)}</p>
+           <p>${esc(p.interpretation.interpretation)}</p>
+           <p><em>${esc(p.interpretation.question)}</em></p>
+           <p class="muted small">${esc(INTERPRETATION_LABEL)} ${esc(PALACE_BASIS_NOTE)}</p>`
+        : ""}
       ${p.translationNote ? `<p class="muted small">${esc(p.translationNote)}</p>` : ""}
       ${p.structuralNote ? `<p class="muted small">${esc(p.structuralNote)}</p>` : ""}
       ${p.measured
@@ -271,21 +277,23 @@ export function renderReading(reading, { insightsCaveatText = "" } = {}) {
 }
 
 /**
- * Reading with a share-gate overlay on the deeper sections.
+ * The reading behind the v1 hard paywall (owner decision L-03).
  *
- * When `locked` is true, Three Courts, Qi Se and Twelve Palaces are wrapped
- * in a container with a frosted-glass overlay so their presence is visible
- * but their detail is not readable without unlocking. Five Elements (face
- * shape) remains fully visible — it is the tradition-attributed anchor that
- * tells the user they have a reading to unlock.
+ * Free: Three Sections and the colour (qi se) reading. Paid: the full trait
+ * mapping (Five Elements and the shape narrative) and the Twelve Palaces.
  *
- * When `locked` is false this is identical to `renderReading`.
+ * When `locked` is true the paid sections are NOT RENDERED. This replaced a
+ * frosted-glass overlay that put the paid text into the page and blurred it
+ * with CSS, which made "view source" the unlock and made a paid product
+ * readable for free. Locked content is absent, not hidden.
+ *
+ * When `locked` is false this is the complete reading.
  *
  * @param {object} reading   composeReading() output
  * @param {object} opts
- * @param {boolean}  opts.locked      true → show overlay
- * @param {string}  [opts.overlayHtml]  HTML injected into the overlay panel
- *        (the share-gate prompt, supplied by ui.js). Only rendered when locked.
+ * @param {boolean}  opts.locked      true -> paid sections omitted
+ * @param {string}  [opts.overlayHtml]  the paywall panel, supplied by ui.js.
+ *        Only rendered when locked.
  */
 export function renderReadingGated(
   reading, { locked = true, overlayHtml = "", insightsCaveatText = "" } = {},
@@ -295,36 +303,19 @@ export function renderReadingGated(
   let used = false;
   const openDiffer = () => (used ? false : (used = true));
 
-  const insights = insightsFor(reading, insightsCaveatText);
-
-  // The teaser sits with Five Elements on the free side: both are the
-  // tradition-attributed anchor that tells the user a reading exists. The
-  // full narrative sits with the deep sections, behind the gate.
   const freeSection = `
     <p class="reading-lead">${esc(READING_LEAD)}</p>
-    ${renderFiveElements(reading.fiveElements, openDiffer)}
-    ${renderInsightsTeaser(insights)}`;
-
-  const gatedSections = `
-    ${renderQiSe(reading.qiSe, openDiffer)}
     ${renderThreeCourts(reading.threeCourts, openDiffer)}
-    ${renderPalaces(reading.twelvePalaces, openDiffer)}
-    ${renderInsightsReport(insights)}`;
+    ${renderQiSe(reading.qiSe, openDiffer)}`;
 
-  if (!locked) {
+  if (locked) {
     return `<div class="reading">
       ${freeSection}
-      ${gatedSections}
+      <div class="reading-gate">${overlayHtml}</div>
     </div>`;
   }
 
-  return `<div class="reading">
-    ${freeSection}
-    <div class="reading-gate-wrap">
-      <div class="reading-gate-blur" aria-hidden="true">${gatedSections}</div>
-      <div class="reading-gate-overlay">${overlayHtml}</div>
-    </div>
-  </div>`;
+  return renderReading(reading, { insightsCaveatText });
 }
 
 /**

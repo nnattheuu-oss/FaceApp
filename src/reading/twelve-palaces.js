@@ -43,6 +43,8 @@
  * Taiqing Shenjian folio for name and location.
  */
 
+import { PALACE_INTERPRETATIONS, APP_AUTHORED } from "./palace-interpretations.js";
+
 const PALACE_LAYOUT = [
   {
     key: "life", name: "Life Palace",
@@ -125,11 +127,24 @@ const PALACE_LAYOUT = [
   },
 ];
 
+/*
+ * Heritage prose and app-authored interpretation never share a field.
+ * The ten palaces with no source conflict carry tradition-attributed
+ * `reading` (DR-2026-09-09-R8-TWELVE-PALACES-RESTORED). The two whose
+ * placement this project's own sources dispute (Wealth, Property) carry no
+ * `reading`; instead they carry the L-05 app-authored interpretation
+ * (DR-2026-09-23-LAUNCH-V1), labelled as SpiritMaxx's own, so the paid
+ * Twelve Palaces is never an empty box and never passes our words off as the
+ * tradition's. Reconciled in M0 (docs/MONETISATION_AUDIT_2026-09.md).
+ */
 export const PALACES = Object.freeze(PALACE_LAYOUT.map((palace) => {
   const structurallyDisputed = palace.reading === null;
+  const interpretation = structurallyDisputed ? (PALACE_INTERPRETATIONS[palace.key] ?? null) : null;
   return Object.freeze({
     ...palace,
     heritageStatus: structurallyDisputed ? "WITHHELD_STRUCTURAL_DISAGREEMENT" : "RUNTIME_PROSE",
+    interpretation,
+    interpretationStatus: interpretation ? APP_AUTHORED : null,
   });
 }));
 

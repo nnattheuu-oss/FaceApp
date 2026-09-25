@@ -9,6 +9,9 @@ import { GROUND, PALETTE } from "./palette.js";
 import { sealModel } from "./seal.js";
 import { isLowConfidence } from "../../qise/baseline.js";
 import { compositionOf } from "../../qise/composition.js";
+import { hasFeature } from "../../billing/entitlements.js";
+import { FEATURE } from "../../billing/catalogue.js";
+import { INTERPRETATION_LABEL } from "../../reading/palace-interpretations.js";
 
 export const SHARE_CADENCES = Object.freeze({
   today: Object.freeze({ days: 1, label: "Today", title: "Your Qi Se today" }),
@@ -67,8 +70,14 @@ function structuralShareLine(reading) {
 
 /**
  * The closed, privacy-minimised model shared by canvas rendering and tests.
+ *
+ * `entitlement` decides whether the structural line (the Five Elements frame,
+ * a paid feature under L-03) may appear. It defaults to none, so a caller that
+ * forgets to pass it shares the free card, never the paid one: a share card is
+ * the most public surface there is (CLAUDE.md item 35), and a paywall that
+ * leaks through it is decorative.
  */
-export function shareCardModel(history, cadence = "today") {
+export function shareCardModel(history, cadence = "today", { entitlement = null } = {}) {
   const key = safeCadence(cadence);
   const definition = SHARE_CADENCES[key];
   const readings = (Array.isArray(history) ? history : [])
@@ -104,7 +113,11 @@ export function shareCardModel(history, cadence = "today") {
     count: readings.length,
     seals,
     composition,
-    structureLine: newest ? structuralShareLine(newest) : null,
+    structureLine: newest && hasFeature(entitlement, FEATURE.FULL_TRAIT_MAPPING)
+      ? structuralShareLine(newest)
+      : null,
+    // L-05: every reading carries the interpretation label, the card included.
+    label: INTERPRETATION_LABEL,
     caption: key === "today" && newest
       ? (newest.compass
         ? "A private reflection on what shifted today."
@@ -289,7 +302,8 @@ export function renderShareCanvas(model, documentRef = document) {
   wrapText(ctx, model.privacyLine, 96, 1160, 888, 36, 2);
   ctx.fillStyle = "rgba(27,25,23,.56)";
   ctx.font = "24px system-ui, sans-serif";
-  ctx.fillText(model.footer, 96, 1250);
+  ctx.fillText(model.label, 96, 1250);
+  ctx.fillText(model.footer, 96, 1290);
   return canvas;
 }
 
@@ -298,8 +312,8 @@ const canvasBlob = (canvas) => new Promise((resolve, reject) => {
 });
 
 /** Native share where possible; a local PNG download everywhere else. */
-export async function shareReadings(history, cadence = "today", env = window) {
-  const model = shareCardModel(history, cadence);
+export async function shareReadings(history, cadence = "today", env = window, { entitlement = null } = {}) {
+  const model = shareCardModel(history, cadence, { entitlement });
   if (!model.count) return { status: "empty", model };
 
   const canvas = renderShareCanvas(model, env.document);
@@ -307,7 +321,7 @@ export async function shareReadings(history, cadence = "today", env = window) {
   const file = new env.File([blob], `qise-${model.cadence}.png`, { type: "image/png" });
   const payload = {
     title: model.title,
-    text: `${model.summary}\n${model.footer}`,
+    text: `${model.summary}\n${model.label}\n${model.footer}`,
     files: [file],
   };
 

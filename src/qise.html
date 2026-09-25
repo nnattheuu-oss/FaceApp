@@ -197,6 +197,9 @@ button[disabled]{opacity:.45;cursor:not-allowed}
 @keyframes star-wake{50%{transform:scale(.6);opacity:.4}}
 .reading-stage{display:inline-flex;border:1px solid var(--qise-border);border-radius:999px;padding:.25rem .65rem;margin:0 0 .75rem;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;opacity:.76}
 .reading-hook{font-family:var(--passage);font-size:clamp(2rem,7.8vw,3.15rem);font-weight:500;line-height:1.03;letter-spacing:-.035em;margin:.45rem auto .85rem;max-width:30rem}
+.interpretation-label{font-size:.78rem;letter-spacing:.02em;margin:.5rem auto 0;max-width:30rem}
+.paywall-offer{margin:.8rem 0}
+.palace-question{margin-top:.6rem}
 .reading-verdict{font-size:.94rem;font-weight:500;line-height:1.5;max-width:30rem;margin:0 auto}
 .reflection{position:relative;border:0;padding:1.15rem 1.15rem 1.15rem 2.1rem;margin:1rem 0;background:color-mix(in srgb,var(--chi) 8%,var(--qise-surface));border-radius:20px;font-family:var(--passage);font-size:1.12rem;line-height:1.55}
 .reflection::before{content:"“";position:absolute;left:.72rem;top:.35rem;color:var(--chi);font-size:2.4rem;line-height:1}
@@ -371,6 +374,7 @@ html[data-screen-flash="true"] .capture-badge span{background:#FFFDF5;box-shadow
         <li>Your photo stays on this phone and is discarded after the scan.</li>
         <li>The reading compares you only with your own previous scans.</li>
         <li>This is entertainment and self-reflection, not a rating or a medical opinion.</li>
+        <li>For adults 18 and over.</li>
       </ul>
       <div class="consent-actions"><button class="primary wide" id="consent-next" type="button">Begin my reading</button></div>
       <p class="muted"><a href="./privacy.html">Read the privacy policy</a></p>
@@ -491,8 +495,9 @@ html[data-screen-flash="true"] .capture-badge span{background:#FFFDF5;box-shadow
       <p class="eyebrow">Today’s note</p>
       <h1 class="reading-hook" id="reading-h"><span id="reading-hook"></span></h1>
       <p class="reading-verdict" id="reading-verdict"></p>
+      <p class="muted interpretation-label" id="reading-label"></p>
       <div class="today-next">
-        <p><strong>Your reading is ready.</strong><br>Enter the complete twelve-palace map and choose the symbol that holds your attention.</p>
+        <p id="today-next-copy"><strong>Your reading is ready.</strong></p>
         <button type="button" id="today-palaces">Enter 12 palaces</button>
       </div>
     </div>
@@ -507,7 +512,7 @@ html[data-screen-flash="true"] .capture-badge span{background:#FFFDF5;box-shadow
           <span style="--star:0"></span><span style="--star:1"></span><span style="--star:2"></span><span style="--star:3"></span><span style="--star:4"></span><span style="--star:5"></span>
           <span style="--star:6"></span><span style="--star:7"></span><span style="--star:8"></span><span style="--star:9"></span><span style="--star:10"></span><span style="--star:11"></span>
         </div>
-        <strong>12 of 12 palaces revealed</strong>
+        <strong id="palace-orbit-label">12 palaces</strong>
       </div>
       <div class="today-shortcuts">
         <button type="button" id="today-pattern">See what changed</button>
@@ -530,6 +535,7 @@ html[data-screen-flash="true"] .capture-badge span{background:#FFFDF5;box-shadow
   <section class="reading-panel" data-reading-panel="story" role="tabpanel" hidden>
     <p class="eyebrow" id="story-eyebrow">The tradition’s reading</p>
     <h1 id="story-heading">The story beneath today</h1>
+    <p class="muted interpretation-label" id="story-label"></p>
     <div class="surface"><p class="story-passage" id="reading-passage"></p></div>
     <div class="surface" id="reflection-story" hidden></div>
     <div class="surface" id="reflection-compare" hidden></div>
@@ -542,6 +548,7 @@ html[data-screen-flash="true"] .capture-badge span{background:#FFFDF5;box-shadow
     <p class="eyebrow">Your own pattern</p>
     <h1>What changed — and what the scan could see</h1>
     <p class="muted pattern-intro">These views use only your previous scans. They do not compare you with anyone else.</p>
+    <p class="muted lighting-caveat" id="lighting-caveat" data-launch-copy="L-08-interim">Colour readings move with the light. Scan in similar light each time, in the same room and at a similar time of day, so each comparison with your earlier scans is a fair one. A change here describes the colour the camera saw, never a verdict on you.</p>
     <section class="pattern-progress" id="pattern-progress" aria-labelledby="pattern-progress-h"></section>
     <div class="surface" id="pattern-range"><div class="section-label"><h2>Your recent range</h2><span class="muted">Personal range</span></div><div id="reading-gauges"></div></div>
     <div class="section-label"><h2>Areas read clearly</h2><span class="muted">Scan coverage</span></div><div class="courts" id="reading-courts"></div>

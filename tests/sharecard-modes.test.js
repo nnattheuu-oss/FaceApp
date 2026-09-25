@@ -63,15 +63,27 @@ test("locked is the default — a card is not unlocked by omission", () => {
   assert.deepEqual(m.readings, []);
 });
 
-test("the locked card carries shape, value, teaser, CTA and the caveat", () => {
+test("the locked card carries the teaser, CTA and caveat, and NO paid trait mapping", () => {
+  // L-03: Five Elements and the canon comparison are paid. A locked card is
+  // posted publicly by someone who has not bought them. It previously carried
+  // both, under the teaser "Full TCM Report + Aesthetic Analysis" -- a health
+  // framing and an attractiveness framing on the most public surface there is.
   const m = buildShareModel(reading(), CAVEAT, { unlocked: false, url: "https://example.com" });
   const text = drawnText(m);
 
-  assert.match(text, /Square — Metal Element/);
-  assert.match(text, /82\/100/);
-  assert.match(text, /Full TCM Report \+ Aesthetic Analysis/);
+  assert.doesNotMatch(text, /Metal Element/);
+  assert.doesNotMatch(text, /82\/100/);
+  assert.doesNotMatch(text, /TCM|Aesthetic/);
+  assert.match(text, /The full reading/);
   assert.match(text, /Scan your face → https:\/\/example\.com/);
   assert.match(text, /Entertainment only/);
+});
+
+test("the unlocked card carries the shape and the labelled canon value", () => {
+  const m = buildShareModel(reading(), CAVEAT, { unlocked: true, url: "https://example.com" });
+  const text = drawnText(m);
+  assert.match(text, /Square — Metal Element/);
+  assert.match(text, /82\/100/);
 });
 
 test("the padlock is vector, so it cannot rasterise as a missing glyph", () => {
@@ -164,7 +176,9 @@ test("the canon value never appears without what it is a match to", () => {
   // A bare "82/100" beside a face shape, on an image about to be posted
   // publicly, reads as a rating of a person — the one thing this number is
   // not, and what consent clause 04 promises the app does not do.
-  for (const unlocked of [false, true]) {
+  // Only the unlocked card draws the value at all (L-03); the locked case is
+  // pinned by "the locked card carries ... NO paid trait mapping".
+  for (const unlocked of [true]) {
     for (const variant of ["story", "square"]) {
       const m = buildShareModel(reading(), CAVEAT, { unlocked, url: "https://example.com" });
       const text = drawnText(m, variant);

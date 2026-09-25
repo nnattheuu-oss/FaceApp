@@ -196,6 +196,43 @@ Use this register to stop prompts, discussions and implementation from collapsin
 - **Human and external gates:** the product owner retains product decisions and diff review. Consented participant/device evidence, source review, legal/rights review, the unresolved history-retention decision and store approval cannot be manufactured or self-certified by an agent. Superseded for cultural-review dependency by DR-2026-08-19-CULTURAL-REVIEW-RETIREMENT.
 - **Supersedes:** the unresolved state of this same decision record. Option A is parked, not the selected product direction.
 
+### DR-2026-09-23-LAUNCH-V1
+
+- **Date:** 23 September 2026
+- **Owner:** product owner (M)
+- **Status:** approved (owner decisions L-01 to L-11); implementation partial — see below.
+- **Record:** `docs/LAUNCH_V1_OWNER_DECISIONS.md` (verbatim). Audit, blockers and
+  implementation evidence: `docs/LAUNCH_V1_AUDIT.md`.
+- **Decision (summary):** Google Play only, AU/NZ/UK/CA, 18+, Entertainment (L-01, L-02).
+  Three offers — `spiritmaxx_full_reading_lifetime` (AUD 34.99 one time) and `spiritmaxx_qi`
+  (`quarterly` AUD 24.99 every 3 months; `annual` AUD 79.99 every year) — with no weekly plan,
+  no trial, no introductory offer, prices read from Play, and a hard paywall after scan + Three
+  Sections + Qi Se baseline (L-03). No share reward (L-04). Every reading labelled "SpiritMaxx
+  interpretation, inspired by classical Mien Shiang."; quotation only from Kanripo KR3g0043–0046
+  with a locator (L-05). The lexicon lint is the only content gate (L-06). No user data leaves
+  the device (L-09). Falsification-first tests for scanner, consent and billing (L-10).
+  `targetSdkVersion` 36 (L-11).
+- **Supersedes, for v1 only:** the monetisation document's weekly TL;DR, "every 13 weeks" and
+  share-to-unlock; heritage research gates and the dossier freeze as launch blockers (they
+  continue as research-track work). This resolves the Unresolved proposal "Exact lifetime,
+  quarterly and annual prices and which SKU launches first" for v1.
+- **NOT superseded, and therefore reported rather than resolved (the record's own STOP rule):**
+  `DR-2026-08-17-REFLECTION-ENGINE-INTERNAL-DEFAULT` and the charter's Engine posture still say
+  the public default stays on the passage engine until the heritage rights gates close. L-05
+  makes those gates research-track and L-07 prefers the Reflection Engine, but neither lists the
+  Reflection Engine record under Supersedes. `src/qise/reading-flags.js` is therefore unchanged:
+  the public origin still renders the passage engine. Audit finding STOP-1.
+- **Implemented under this record:** Play Billing entitlement (`src/billing/`), the hard paywall
+  on both reading views, share-to-unlock / Lemon Squeezy / weekly plan / local unlock flag
+  removed, twelve app-authored palace interpretations under the L-05 label, the L-06 claim
+  gate on source and artefact, 18+ statements, an interim Qi Se lighting caveat, the Android
+  wrapper template and check. Purchases stay CLOSED (`ACKNOWLEDGEMENT_ROUTE = null`) until
+  audit findings B-1 and B-2 are decided: Play refunds unacknowledged purchases after three
+  days and the Digital Goods API cannot acknowledge without a backend, which L-09 forbids.
+- **Tests:** `tests/billing.test.js`, `scripts/billing-falsify.mjs` (13 mutations, all caught),
+  `tests/launch-content-gate.test.js`, `tests/check-android.test.js`,
+  `e2e/qise-paywall.spec.js`.
+
 ### DR-2026-09-06-SCANNER-CAPTURE-CORRECTION
 
 - **Date:** 6 September 2026
@@ -673,7 +710,7 @@ These must not be implemented as settled decisions without approval:
 
 - A strict rolling 90-day TTL for derived IndexedDB history. Reconcile it with the existing baseline window, migration, user controls and deletion semantics first.
 - React/Vite migration. If approved, explicitly solve GitHub Pages base paths and MediaPipe WASM/asset resolution; this is not a current-stack bug.
-- Exact lifetime, quarterly and annual prices and which SKU launches first.
+- ~~Exact lifetime, quarterly and annual prices and which SKU launches first.~~ Resolved for v1 by `DR-2026-09-23-LAUNCH-V1` (L-03). What the `spiritmaxx_qi` subscription grants beyond the lifetime product is NOT decided (audit finding B-4).
 - Whether the product is legally a biometric categorisation system, whether Article 50(3) applies, and the resulting notice flow.
 - A future corpus-schema property for tradition attribution. Current DOM markers use kebab-case `data-copy`; do not infer a JSON field name from that syntax.
 - Unimplemented scanner improvements, including underexposure rejection and any threshold changes. Thresholds require recorded evidence and must not be silently retuned.

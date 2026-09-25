@@ -62,6 +62,12 @@ import { createThemeController } from "./theme.js";
 import { findPatterns, describePattern } from "../../qise/patterns.js";
 import { compositionOf } from "../../qise/composition.js";
 import { measureIntegratedReading } from "../../qise/integrated.js";
+import { connectBilling, readEntitlement, BILLING } from "../../billing/entitlements.js";
+import { loadOffers } from "../../billing/offers.js";
+import { purchase } from "../../billing/purchase.js";
+import { ACKNOWLEDGEMENT_ROUTE } from "../../billing/catalogue.js";
+import { gateIntegratedModel, paywallModel, paywallMarkup, purchaseMessage } from "./paywall.js";
+import { INTERPRETATION_LABEL, PALACE_BASIS_NOTE } from "../../reading/palace-interpretations.js";
 import * as color from "../../qise/color.js";
 
 const MEDIAPIPE_BUNDLE = new URL("../../vendor/mediapipe/vision_bundle.mjs", import.meta.url).href;
@@ -80,6 +86,26 @@ let scratch = null;
 let activeShareCadence = "week";
 let captureRun = 0;
 let activeReadingTab = "today";
+
+/*
+ * Play Billing access (L-03). The connection is memoised; the ENTITLEMENT is
+ * not -- it is re-read from Play on every render (see billing/entitlements.js
+ * for why nothing about who paid is ever cached on this device). A retry
+ * drops the memo so a transient failure is not permanent for the session.
+ */
+let billingConnection = null;
+let lastAccess = null;
+let currentReading = null;
+function billing() {
+  if (!billingConnection) billingConnection = connectBilling(window);
+  return billingConnection;
+}
+async function currentAccess() {
+  const connection = await billing();
+  const read = await readEntitlement(connection);
+  lastAccess = { connection, ...read };
+  return lastAccess;
+}
 let illuminationRequested = false;
 let screenLightRequested = false;
 let screenLightRevision = 0;
@@ -882,7 +908,7 @@ async function runSelfie(file) {
       burst[name] = Array.from({ length: BURST_FRAMES }, () => ({ ...sample }));
     }
     $("ring-fill").setAttribute("stroke-dashoffset", "0");
-    $("gate-line").textContent = "Analyzing geometry… Mapping all 12 palaces.";
+    $("gate-line").textContent = "Analysing geometry… Mapping the face regions.";
     $("selfie-status").textContent = "The selected photo will now be discarded.";
     const illumination = publicIlluminationSummary(null, {
       requested: illuminationRequested,
@@ -993,9 +1019,9 @@ async function finish(burst, rois, sclera, opened, history, gateMargins, illumin
 
   let integrated = null;
   if (acceptedImage && acceptedPoints) {
-    $("gate-line").textContent = "Analyzing geometry… Mapping all 12 palaces.";
+    $("gate-line").textContent = "Analysing geometry… Mapping the face regions.";
     integrated = measureIntegratedReading(acceptedImage, acceptedPoints);
-    $("gate-line").textContent = "12 palaces unlocked. Opening your reading…";
+    $("gate-line").textContent = "Regions mapped. Opening your reading…";
   }
 
   const reading = {
@@ -1076,10 +1102,11 @@ function integratedTodayMarkup(model) {
     </div>`;
 }
 
-function integratedStoryMarkup(model) {
+function integratedStoryMarkup(model, paywall = null) {
   if (!model?.available) return model?.note
     ? `<section class="structure-section"><p class="muted">${esc(model.note)}</p></section>`
     : "";
+  const locks = model.locks || { traitMapping: false, palaces: false };
 
   const courtNames = { upper: "Upper", middle: "Middle", lower: "Lower" };
   const courtBars = Object.entries(model.courts.percentages).map(([key, value]) =>
@@ -1087,7 +1114,7 @@ function integratedStoryMarkup(model) {
       <span class="court-track"><span class="court-fill" style="width:${value || 0}%"></span></span>
       <span class="num">${value ?? "—"}%</span></div>`).join("");
   const palaceAccents = ["chi", "huang", "qing", "bai", "hei"];
-  const palaceList = model.palaces.all || model.palaces.measured;
+  const palaceList = locks.palaces ? [] : (model.palaces.all || model.palaces.measured);
   const palaces = palaceList.map((palace, index) => {
     const revealId = `palace-reveal-${esc(palace.key)}`;
     const status = palace.measured ? "region available" : "region unavailable";
@@ -1104,7 +1131,13 @@ function integratedStoryMarkup(model) {
         <span class="palace-tone" data-contextual="${!palace.measured}">${esc(status)}</span>
         ${reading
           ? `<p>${esc(reading)}</p>`
-          : `<p class="source-note">${esc(palace.sourceReviewNote || "This project's own sources disagree on where this palace sits, so no heritage reading is offered for it.")}</p>`}
+          : palace.interpretation
+            ? `<p class="palace-lens">${esc(palace.interpretation.lens)}</p>
+               <p>${esc(palace.interpretation.interpretation)}</p>
+               <p class="palace-question"><em>${esc(palace.interpretation.question)}</em></p>
+               <p class="source-note">${esc(INTERPRETATION_LABEL)} ${esc(PALACE_BASIS_NOTE)}</p>
+               ${palace.sourceReviewNote ? `<p class="source-note">${esc(palace.sourceReviewNote)}</p>` : ""}`
+            : `<p class="source-note">${esc(palace.sourceReviewNote || "This project's own sources disagree on where this palace sits, so no heritage reading is offered for it.")}</p>`}
         ${palace.translationNote ? `<p class="source-note">${esc(palace.translationNote)}</p>` : ""}
         ${palace.measured ? "" : `<p class="source-note">${esc(palace.notMeasuredNote)}</p>`}
       </div>
@@ -1113,12 +1146,24 @@ function integratedStoryMarkup(model) {
   const harmonyParts = (model.harmony?.components || []).map((component) =>
     `<span class="harmony-part">${esc(component.key)}${component.percent === null ? "" : ` · ${component.percent}%`}</span>`).join("");
 
-  return `<section class="structure-section">
+  const elementSection = locks.traitMapping ? "" : `<section class="structure-section">
       <p class="eyebrow">Five Elements</p>
       <h2>${esc(model.element.name)} · ${esc(model.element.shape)} geometry</h2>
       <p class="structure-reading">${esc(model.element.reading)}</p>
       <details class="source-note"><summary>Where sources differ</summary><p>${esc(model.element.sourcesDiffer)}</p></details>
-    </section>
+    </section>`;
+  const palaceSection = locks.palaces ? "" : `<section class="structure-section palace-collection" id="palace-collection">
+      <p class="eyebrow">Twelve Palaces</p>
+      <div class="palace-heading"><div><h2>Twelve palaces: ten from the tradition, two in our own words</h2>
+      <p class="muted">${model.palaces.measuredCount} of ${model.palaces.totalCount} regions were clearly visible in this scan. Where this project's sources disagree on a palace's placement, the reading is ours, not the tradition's. ${esc(INTERPRETATION_LABEL)}</p></div>
+      <div class="palace-count" aria-label="${model.palaces.measuredCount} of ${model.palaces.totalCount} regions visible"><strong>${model.palaces.measuredCount}</strong><span>/ ${model.palaces.totalCount}</span></div></div>
+      <div class="palace-grid">${palaces}</div>
+      <button class="palace-delight" type="button" data-delight="palaces">Save this reading</button>
+      ${model.palaces.sourceReviewNote ? `<p class="source-note">${esc(model.palaces.sourceReviewNote)}</p>` : ""}
+      <details class="source-note"><summary>Placement note</summary><p>${esc(model.palaces.sourcesDiffer)}</p></details>
+    </section>`;
+
+  return `${elementSection}
     <section class="structure-section">
       <p class="eyebrow">Three Sections</p>
       <h2>${esc(model.courts.label)}</h2>
@@ -1126,16 +1171,8 @@ function integratedStoryMarkup(model) {
       <p class="structure-reading">${esc(model.courts.measurementObservation)}</p>
       <p class="source-note">${esc(model.courts.measurementCaveat)}</p>
     </section>
-    <section class="structure-section palace-collection" id="palace-collection">
-      <p class="eyebrow">Twelve Palaces</p>
-      <div class="palace-heading"><div><h2>Ten of twelve palaces read; two measured only</h2>
-      <p class="muted">${model.palaces.measuredCount} of ${model.palaces.totalCount} regions were available in this scan. Two palaces are measured but not interpreted — see the placement note below.</p></div>
-      <div class="palace-count" aria-label="${model.palaces.measuredCount} of ${model.palaces.totalCount} regions measured"><strong>${model.palaces.measuredCount}</strong><span>/ ${model.palaces.totalCount}</span></div></div>
-      <div class="palace-grid">${palaces}</div>
-      <button class="palace-delight" type="button" data-delight="palaces">Save this reading</button>
-      ${model.palaces.sourceReviewNote ? `<p class="source-note">${esc(model.palaces.sourceReviewNote)}</p>` : ""}
-      <details class="source-note"><summary>Placement note</summary><p>${esc(model.palaces.sourcesDiffer)}</p></details>
-    </section>
+    ${palaceSection}
+    ${paywall ? paywallMarkup(paywall, esc) : ""}
     ${model.harmony ? `<section class="structure-section">
       <p class="eyebrow">Named proportion canons</p>
       <h2>${esc(model.harmony.label)}</h2>
@@ -1442,6 +1479,18 @@ async function renderReading(reading) {
   const history = await store.all();
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const m = readingScreenModel(reading, history, { reducedMotion: reduced });
+  currentReading = reading;
+  const access = await currentAccess();
+  const integrated = gateIntegratedModel(m.integrated, access.entitlement);
+  const locks = integrated?.locks || { traitMapping: false, palaces: false };
+  let paywall = null;
+  if (integrated?.available && (locks.traitMapping || locks.palaces)) {
+    const purchasesOpen = Boolean(ACKNOWLEDGEMENT_ROUTE);
+    const offers = access.status === BILLING.VERIFIED && purchasesOpen
+      ? await loadOffers(access.connection, { locale: navigator.language || "en-AU" })
+      : { offers: [] };
+    paywall = paywallModel({ billingStatus: access.status, offers: offers.offers, purchasesOpen });
+  }
 
   $("reading-seal").innerHTML = m.sealSvg;
   $("reading-verdict").textContent = m.verdict;
@@ -1455,10 +1504,26 @@ async function renderReading(reading) {
     ? "vs your pattern"
     : "today’s capture";
   $("reading-composition").innerHTML = compositionMarkup(m.composition);
+  $("reading-label").textContent = INTERPRETATION_LABEL;
+  $("story-label").textContent = INTERPRETATION_LABEL;
   const integratedCard = $("reading-integrated");
-  integratedCard.hidden = !m.integrated.available;
-  integratedCard.innerHTML = integratedTodayMarkup(m.integrated);
-  $("reading-structure-story").innerHTML = integratedStoryMarkup(m.integrated);
+  integratedCard.hidden = !integrated.available || locks.traitMapping;
+  integratedCard.innerHTML = integratedCard.hidden ? "" : integratedTodayMarkup(integrated);
+  $("reading-structure-story").innerHTML = integratedStoryMarkup(integrated, paywall);
+  // Three states, not two: a paying user whose scan could not map the face
+  // must not be told the palaces are something to buy.
+  const todayState = !integrated.available ? "unmapped" : locks.palaces ? "locked" : "open";
+  const todayCopy = {
+    open: ["<strong>Your reading is ready.</strong><br>Enter the twelve-palace map and choose the question that holds your attention.",
+      "Enter 12 palaces", "12 of 12 palaces open"],
+    locked: ["<strong>Your free reading is ready.</strong><br>Your Three Sections and colour baseline are below. The twelve palaces are part of the full reading.",
+      "See the full reading", "12 palaces in the full reading"],
+    unmapped: ["<strong>Your colour reading is ready.</strong><br>This scan did not map enough of the face for the palaces. Face the camera straight on next time.",
+      "See the story", "12 palaces"],
+  }[todayState];
+  $("today-next-copy").innerHTML = todayCopy[0];
+  $("today-palaces").textContent = todayCopy[1];
+  $("palace-orbit-label").textContent = todayCopy[2];
   releasePalaceExperience();
   releasePalaceExperience = bindPalaceExperience($("reading-structure-story"), {
     reducedMotion: reduced,
@@ -1581,7 +1646,9 @@ async function renderHistory() {
 async function shareCurrent(cadence) {
   const status = document.querySelector('.screen[data-active="true"] .share-status') || $("share-status");
   status.textContent = "Preparing your private share card…";
-  const result = await shareReadings(await store.all(), cadence);
+  const result = await shareReadings(await store.all(), cadence, window, {
+    entitlement: lastAccess?.entitlement ?? null,
+  });
   status.textContent = {
     empty: "Complete a face scan before sharing.",
     shared: "Shared. The card contains no face photo or raw measurements.",
@@ -1650,9 +1717,37 @@ async function boot() {
   }
   $("today-palaces").addEventListener("click", () => {
     selectReadingTab("story", { scroll: false });
-    requestAnimationFrame(() => $("palace-collection")?.scrollIntoView({ behavior: "smooth" }));
+    // Locked readings have no palace section at all (hard paywall), so the
+    // paywall is where this button leads instead.
+    requestAnimationFrame(() => ($("palace-collection") || document.querySelector("#reading-structure-story .paywall"))
+      ?.scrollIntoView({ behavior: "smooth" }));
   });
   $("today-pattern").addEventListener("click", () => selectReadingTab("pattern"));
+  // The paywall is re-rendered with every reading, so its buttons are handled
+  // by delegation on the container that outlives them.
+  $("reading-structure-story").addEventListener("click", async (event) => {
+    const buy = event.target.closest("[data-buy]");
+    const retry = event.target.closest("[data-paywall-retry]");
+    if (!buy && !retry) return;
+    const status = $("reading-structure-story").querySelector("[data-paywall-status]");
+    if (retry) {
+      billingConnection = null;
+      if (currentReading) await renderReading(currentReading);
+      return;
+    }
+    buy.disabled = true;
+    if (status) status.textContent = "Opening Google Play…";
+    try {
+      const result = await purchase(buy.dataset.buy, { connection: await billing() });
+      if (status) status.textContent = purchaseMessage(result.status);
+      if (result.status === "purchased" && currentReading) await renderReading(currentReading);
+    } catch (error) {
+      console.error("purchase failed:", error);
+      if (status) status.textContent = purchaseMessage("failed");
+    } finally {
+      buy.disabled = false;
+    }
+  });
   $("today-delight").addEventListener("click", () => shareCurrent("today").catch((error) => {
     console.error(error);
     $("share-status").textContent = "The moment could not be prepared. Your reading is unchanged.";

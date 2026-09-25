@@ -36,33 +36,23 @@ const DIST = join(REPO, "dist");
  * model. Both are MediaPipe asset hosts, neither receives user data: the model
  * is a GET of a static file.
  *
- * Sentry and RevenueCat are NOT listed as active. Neither is integrated. When
- * they are, add the pattern here and the guard will start enforcing it — the
- * placeholder assertions below check the shape rather than pretending the
- * integration exists.
+ * Sentry is NOT listed as active; it is not integrated. RevenueCat is not
+ * used at all: purchases go through Google Play Billing on the device (L-03,
+ * L-09), so there is no purchase backend to allow.
  */
 export const EGRESS_ALLOWLIST = [
   /*
-   * Lemon Squeezy hosted checkout — the ONLY payment destination.
-   *
-   * Constrained the same way the documentation links are, and for the same
-   * reason: the pattern is anchored at both ends and the path segment excludes
-   * `?` and `#`, so a query string or fragment cannot match. That is not
-   * decoration. A checkout URL is the one place in this app where it would be
-   * natural to append "context" — a zone name, a face shape, a score — and any
-   * such value would be biometric-derived data handed to a third party in a URL
-   * the user is invited to tap. The regex makes that unrepresentable rather
-   * than merely discouraged.
-   *
-   * The product IDs are placeholders until the products exist in the dashboard.
-   * Swapping them changes only the path segment, so this entry does not move.
+   * No payment destination. The Lemon Squeezy hosted checkout that used to be
+   * the only entry here was removed for launch v1 (DR-2026-09-23-LAUNCH-V1):
+   * a Google Play app must sell digital content through Play Billing, which
+   * the app reaches through the Payment Request API, not by URL. The Play
+   * method identifier is a Payment Request identifier and is listed under
+   * IDENTIFIER_URI_ALLOWLIST below, not here.
    */
-  { pattern: /^https:\/\/checkout\.lemonsqueezy\.com\/buy\/[A-Za-z0-9-]+$/, why: "Lemon Squeezy hosted checkout" },
 ];
 
 /** Accepted only when a DSN is configured at runtime; never hardcoded. */
 export const SENTRY_DSN_PATTERN = /^https:\/\/[\w.]+@[\w.-]+\.ingest(\.[a-z]+)?\.sentry\.io\/\d+$/;
-export const REVENUECAT_HOST = "api.revenuecat.com";
 
 /**
  * DOCUMENTATION LINKS — destinations the user may choose to open, which the
@@ -71,8 +61,8 @@ export const REVENUECAT_HOST = "api.revenuecat.com";
  * These are not egress. The guard exists to stop the app SENDING anywhere it
  * shouldn't; a hyperlink the user taps is a navigation they initiated. Both
  * entries are here because something else requires them: the MediaPipe URL is
- * part of the Apache-2.0 attribution, and RevenueCat's policy must be linked
- * from ours if their processing is described.
+ * part of the Apache-2.0 attribution, and Google's privacy policy is linked
+ * from ours because Play processes the payment.
  *
  * They are still constrained: a documentation link may carry NO query string
  * and NO fragment, because either could smuggle a value out in a URL the user
@@ -80,7 +70,9 @@ export const REVENUECAT_HOST = "api.revenuecat.com";
  */
 export const DOC_LINK_ALLOWLIST = [
   /^https:\/\/github\.com\/google-ai-edge\/mediapipe$/,
-  /^https:\/\/www\.revenuecat\.com\/privacy$/,
+  // Google's privacy policy, linked from the Purchases section of ours
+  // because Play Billing processes the payment (L-03).
+  /^https:\/\/policies\.google\.com\/privacy$/,
 ];
 
 /**
@@ -90,6 +82,13 @@ export const DOC_LINK_ALLOWLIST = [
  */
 export const IDENTIFIER_URI_ALLOWLIST = [
   /^https:\/\/json-schema\.org\/draft\/2020-12\/schema$/,
+  /*
+   * The Google Play Billing payment-method identifier (billing/catalogue.js).
+   * Passed to getDigitalGoodsService() and PaymentRequest as a NAME; neither
+   * the page nor Chrome fetches it. Exact string: a query or path suffix would
+   * be a different identifier and needs its own review.
+   */
+  /^https:\/\/play\.google\.com\/billing$/,
   /*
    * Kanripo evidence-source locators — `sourceUrl` on records in
    * `src/reading/provenance.js`, added by the 2026-08-29 project-owned
@@ -116,6 +115,7 @@ export const IDENTIFIER_URI_ALLOWLIST = [
 import {
   BLOCKLIST, DISEASE_TERMS, extractJsProse, extractHtmlCopy, findTerms,
   findAssertive, stripComments as sharedStrip, assertCanary, CANARY_FAILURE,
+  findLaunchContentViolations, READING_SURFACE_FILES,
 } from "./copy-scan.js";
 
 /**
@@ -203,6 +203,22 @@ function guardCopyBlocklist(file, text, flavour) {
 }
 
 /**
+ * L-06, the v1 content gate, on the ARTEFACT. Scoped to the reading surfaces
+ * (READING_SURFACE_FILES) because L-06 governs reading strings: the science
+ * screen must be able to say "research shows", and a disclaimer must be able
+ * to say what the app does not predict.
+ */
+function guardLaunchContent(file, text) {
+  const rel = relative(DIST, file).replace(/\\/g, "/");
+  if (!READING_SURFACE_FILES.includes(rel)) return;
+  launchSurfacesScanned.add(rel);
+  for (const h of findLaunchContentViolations(extractJsProse(text))) {
+    record(`l06-${h.family}`, file, `"${h.match}" in: ${h.text.slice(0, 80)}`);
+  }
+}
+const launchSurfacesScanned = new Set();
+
+/**
  * Split an identifier into its segments: camelCase, snake_case, SCREAMING_CASE.
  *
  * ── WHY SUBSTRING MATCHING IS NOT GOOD ENOUGH HERE ─────────────────────────
@@ -269,7 +285,6 @@ function guardEgress(file, text) {
     if (IDENTIFIER_URI_ALLOWLIST.some((p) => p.test(url))) continue;
     if (EGRESS_ALLOWLIST.some((a) => a.pattern.test(url))) continue;
     if (SENTRY_DSN_PATTERN.test(url)) continue;
-    if (url.includes(REVENUECAT_HOST)) continue;
 
     // A documentation link is a navigation the user initiates, not egress by
     // the app — but only if it carries nothing. A query string or fragment on
@@ -334,6 +349,15 @@ function main() {
     guardAttractiveness(file, text);
     guardEgress(file, text);
     guardNoBiometricEgress(file, text);
+    guardLaunchContent(file, text);
+  }
+
+  // Floor check, same reasoning as the canary: a content gate that silently
+  // scanned fewer reading surfaces than it names is a false all-clear.
+  const unscanned = READING_SURFACE_FILES.filter((f) => !launchSurfacesScanned.has(f));
+  if (unscanned.length) {
+    console.error(`FAIL: L-06 reading surfaces missing from dist/: ${unscanned.join(", ")}`);
+    process.exit(1);
   }
 
   console.log(`Bundle lint — flavour: ${flavour.flavour}, ${files.length} files scanned`);
@@ -355,6 +379,7 @@ function main() {
   console.log("  attractiveness    ok");
   console.log("  egress allowlist  ok");
   console.log("  biometric egress  ok");
+  console.log(`  L-06 content gate ok (${launchSurfacesScanned.size} reading surfaces)`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}` ||

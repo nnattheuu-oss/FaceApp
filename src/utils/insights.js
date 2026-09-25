@@ -18,7 +18,7 @@
  *
  * ── TONE CONTRACT ──────────────────────────────────────────────────────────
  * Every string produced here:
- *   - Uses: "may suggest," "in TCM tradition," "tends toward."
+ *   - Uses: "may suggest," "in Mian Xiang," "tends toward."
  *   - Never uses: "you have," "you are," "your health," "disease," "condition."
  *   - Never references specific health conditions by name.
  *   - Appends the standard entertainment disclaimer to every summary.
@@ -69,12 +69,12 @@ const SHAPE_COPY = {
       "inward-looking quality. Classical Chinese face reading associates this " +
       "proportion with patience and a methodical approach.",
     strengths: [
-      "In TCM tradition, this face proportion tends toward steadiness.",
+      "In Mian Xiang, this face proportion tends toward steadiness.",
       "Classical Mien Xiang texts associate the elongated form with careful deliberation.",
       "Both Chinese and Western portrait traditions note an association with focus.",
     ],
     tendencies: [
-      "In TCM tradition, this proportion may suggest a tendency toward introspection.",
+      "In Mian Xiang, this proportion may suggest a tendency toward introspection.",
       "Classical face reading associates this form with a preference for depth over breadth.",
     ],
   },
@@ -86,12 +86,12 @@ const SHAPE_COPY = {
       "imaginative qualities. The wide forehead is classically associated with " +
       "an active mind and an interest in ideas.",
     strengths: [
-      "In TCM tradition, this face proportion tends toward expressive communication.",
+      "In Mian Xiang, this face proportion tends toward expressive communication.",
       "Classical Mien Xiang texts associate the wide forehead with ideation.",
       "Lavater (1778) noted an association between this form and imaginative tendencies.",
     ],
     tendencies: [
-      "In TCM tradition, this proportion may suggest a tendency toward enthusiasm over caution.",
+      "In Mian Xiang, this proportion may suggest a tendency toward enthusiasm over caution.",
       "Classical face reading associates this form with a preference for novelty.",
     ],
   },
@@ -103,12 +103,12 @@ const SHAPE_COPY = {
       "practical resolve. Both Chinese and Western traditions associate this proportion " +
       "with perseverance.",
     strengths: [
-      "In TCM tradition, this face proportion tends toward reliability.",
+      "In Mian Xiang, this face proportion tends toward reliability.",
       "Classical Mien Xiang texts associate the square form with persistence.",
       "Both Chinese and Western face-reading traditions note an association with practicality.",
     ],
     tendencies: [
-      "In TCM tradition, this proportion may suggest a tendency toward directness.",
+      "In Mian Xiang, this proportion may suggest a tendency toward directness.",
       "Classical face reading associates this form with a preference for structure.",
     ],
   },
@@ -120,28 +120,28 @@ const SHAPE_COPY = {
       "generous qualities. Classical Chinese face reading associates this proportion " +
       "with social ease.",
     strengths: [
-      "In TCM tradition, this face proportion tends toward openness.",
+      "In Mian Xiang, this face proportion tends toward openness.",
       "Classical Mien Xiang texts associate the round form with generosity.",
     ],
     tendencies: [
-      "In TCM tradition, this proportion may suggest a tendency toward harmony-seeking.",
+      "In Mian Xiang, this proportion may suggest a tendency toward harmony-seeking.",
       "Classical face reading associates this form with adaptability.",
     ],
   },
   diamond: {
-    teaserA: "In Mien Shiang, prominent cheekbones may suggest intensity.",
+    teaserA: "In Mien Shiang, a face widest at the cheekbones may suggest intensity.",
     teaserB: "Classical Chinese face reading associates this shape with focused drive.",
     summary:
       "In the Mien Shiang tradition, a diamond face tends toward intensity and " +
-      "precision. Classical Chinese face reading associates dominant cheekbones " +
+      "precision. Classical Chinese face reading associates a wide cheekbone line " +
       "with focused, purposeful qualities.",
     strengths: [
-      "In TCM tradition, this face proportion tends toward precision.",
+      "In Mian Xiang, this face proportion tends toward precision.",
       "Classical Mien Xiang texts associate this form with determination.",
       "Both Chinese and Western traditions note an association with analytical tendencies.",
     ],
     tendencies: [
-      "In TCM tradition, this proportion may suggest a tendency toward intensity.",
+      "In Mian Xiang, this proportion may suggest a tendency toward intensity.",
       "Classical face reading associates this form with high standards.",
     ],
   },
@@ -153,28 +153,28 @@ const SHAPE_COPY = {
       "and openness. Classical Chinese face reading associates this form with a " +
       "capacity to move between contexts.",
     strengths: [
-      "In TCM tradition, this face proportion tends toward balance.",
+      "In Mian Xiang, this face proportion tends toward balance.",
       "Classical Mien Xiang texts associate the oval form with flexibility.",
     ],
     tendencies: [
-      "In TCM tradition, this proportion may suggest a tendency toward adaptability.",
+      "In Mian Xiang, this proportion may suggest a tendency toward adaptability.",
       "Classical face reading associates this form with openness to change.",
     ],
   },
   tree: {
     teaserA: "In Mien Shiang, a tall, column-like face may suggest uprightness.",
-    teaserB: "Classical Chinese face reading associates this proportion with principled tendencies.",
+    teaserB: "Classical Chinese face reading associates this proportion with steady, upright qualities.",
     summary:
-      "In the Mien Shiang tradition, a tree (rectangular) face tends toward integrity " +
-      "and a principled approach. Classical Mien Xiang texts associate this tall, " +
-      "even-width form with conscientiousness.",
+      "In the Mien Shiang tradition, a tree (rectangular) face tends toward steadiness " +
+      "and an even approach. Classical Mien Xiang texts associate this tall, " +
+      "even-width form with constancy.",
     strengths: [
-      "In TCM tradition, this face proportion tends toward principled conduct.",
-      "Classical Mien Xiang texts associate the rectangular form with integrity.",
+      "In Mian Xiang, this face proportion tends toward uprightness.",
+      "Classical Mien Xiang texts associate the rectangular form with constancy.",
       "Both Chinese and Western face-reading traditions note an association with reliability.",
     ],
     tendencies: [
-      "In TCM tradition, this proportion may suggest a tendency toward moral consistency.",
+      "In Mian Xiang, this proportion may suggest a tendency toward consistency.",
       "Classical face reading associates this form with careful, measured responses.",
     ],
   },
@@ -186,12 +186,12 @@ const SHAPE_COPY = {
       "decisiveness and resolve. The broad, angular jaw is classically associated " +
       "with a strong sense of direction.",
     strengths: [
-      "In TCM tradition, this face proportion tends toward decisiveness.",
+      "In Mian Xiang, this face proportion tends toward decisiveness.",
       "Classical Mien Xiang texts associate the angular jaw with strong will.",
       "Both Chinese and Western traditions note an association with tenacity.",
     ],
     tendencies: [
-      "In TCM tradition, this proportion may suggest a tendency toward directness.",
+      "In Mian Xiang, this proportion may suggest a tendency toward directness.",
       "Classical face reading associates this form with confidence in decision-making.",
     ],
   },
@@ -203,12 +203,12 @@ const SHAPE_COPY = {
       "and endurance. Classical Mien Xiang texts associate this wide, low-relief form " +
       "with a calm, patient quality.",
     strengths: [
-      "In TCM tradition, this face proportion tends toward patience.",
+      "In Mian Xiang, this face proportion tends toward patience.",
       "Classical Mien Xiang texts associate the broad form with stamina.",
       "Both Chinese and Western face-reading traditions note an association with composure.",
     ],
     tendencies: [
-      "In TCM tradition, this proportion may suggest a tendency toward measured responses.",
+      "In Mian Xiang, this proportion may suggest a tendency toward measured responses.",
       "Classical face reading associates this form with persistence under pressure.",
     ],
   },
@@ -263,11 +263,20 @@ function canonRange(canonProportion) {
 }
 
 /* Used when no TCM reading was produced. Names the tradition inline and says
- * that the texts disagree, which is item 20's requirement, not decoration. */
+ * that the texts disagree, which is item 20's requirement, not decoration.
+ *
+ * Launch v1 audit (DR-2026-09-23-LAUNCH-V1): this and every shape line used to
+ * say "In TCM tradition". Face-shape temperament lore is Mian Xiang
+ * physiognomy, not Traditional Chinese Medicine; the label misattributed it
+ * AND framed a reading as medicine (L-06 item 1). The old default also stated
+ * the organ-system doctrine in the present tense, which exclusion P3 of
+ * OPTION_B_020_DOSSIER.md §10.2 forbids. Two strength lines named morality
+ * outright ("principled conduct", "moral consistency"), which P5 forbids in
+ * every mode; they now describe the form, not the person's morals. */
 export const TCM_NARRATIVE_DEFAULT =
-  "In TCM tradition, the face is regarded as a map of the body's inner patterns. " +
-  "Classical texts associate each region with a different organ system, though " +
-  "interpretations differ between sources and practitioners.";
+  "In Mian Xiang, the face was read as a map of regions, each given its own " +
+  "meaning in the tradition's terms, though interpretations differ between " +
+  "sources and practitioners.";
 
 /* Questions put to the reader, never statements about them. */
 export const REFLECTION_PROMPTS = [
@@ -298,7 +307,7 @@ export function generateInsights(
   const teaserLines = [copy.teaserA, copy.teaserB];
 
   const tcmNarrative = tcmResult?.summary
-    ? `In TCM tradition, the reading may suggest: ${tcmResult.summary}`
+    ? `In Mian Xiang, the reading may suggest: ${tcmResult.summary}`
     : TCM_NARRATIVE_DEFAULT;
 
   // A statement about the measurement and the canons it was compared with,
