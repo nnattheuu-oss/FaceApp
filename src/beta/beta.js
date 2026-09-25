@@ -39,7 +39,10 @@ import {
   PolygonSmoother, BURST_FRAMES, trimmedMedianLab, reduceBurst, describeCameraError,
   requestCameraRefocus,
 } from "../qise/camera.js";
-import { createLandmarkerWithFallback } from "../landmarker.js";
+import {
+  createLandmarkerWithFallback, selectSingleFace, SINGLE_FACE_NUM_FACES,
+} from "../landmarker.js";
+import { BurstController, createMonotonicTimestamps } from "../qise/capture-integrity.js";
 import {
   evaluateGates, captureInstruction, captureGuide, canUseCurrentLight, DISTANCE_MIN_FRACTION,
 } from "../qise/gates.js";
@@ -239,7 +242,11 @@ async function buildLandmarker() {
     const built = await createLandmarkerWithFallback(
       guardedFactory,
       fileset,
-      { modelAssetPath: FACE_MODEL, runningMode: "VIDEO", outputFaceBlendshapes: false },
+      {
+        modelAssetPath: FACE_MODEL, runningMode: "VIDEO", outputFaceBlendshapes: false,
+        // Two, so a second person is visible and can be refused (M1a fix (a)).
+        numFaces: SINGLE_FACE_NUM_FACES,
+      },
       (message) => { $("gate-line").textContent = message; },
     );
     return built.landmarker;
@@ -446,7 +453,12 @@ async function runCapture() {
   let exposureReleaseStarted = false;
   let lightOverrideRequested = false;
 
-  const latch = new GreenLatch();
+  // The hold and the burst together: resets on a lost face, re-gates every
+  // burst frame (src/qise/capture-integrity.js, M1a fix (b)). Named `latch`
+  // where it is handed to makeAssistTransitionHandler, which only resets it.
+  const burstControl = new BurstController();
+  const latch = burstControl;
+  const detectAt = createMonotonicTimestamps();
   // A SEPARATE latch, same hold duration: while the screen assist is active,
   // this asks "have the real gates looked clean for a full hold-worth of
   // time anyway?" — the cue to try dropping the assist and see if ambient
@@ -489,9 +501,7 @@ async function runCapture() {
   const history = await store.all();
   const scleraHistory = history.map((r) => r.sclera && r.sclera.rawRatios).filter(Boolean);
 
-  const burst = {};
-  let collecting = 0;
-  let lastRois = null, lastSclera = null, lastMargins = null, lastTier = null;
+  let lastRois = null, lastSclera = null;
 
   const scheduler = createFrameScheduler(video);
 
@@ -544,15 +554,21 @@ async function runCapture() {
 
     diagnostics.recordFrame(nowMs);
 
-    const result = landmarker.detectForVideo(video, nowMs);
-    const mesh = result && result.faceLandmarks && result.faceLandmarks[0];
+    const result = landmarker.detectForVideo(video, detectAt(nowMs));
+    const face = selectSingleFace(result);
+    const mesh = face.landmarks;
 
     if (!mesh) {
+      burstControl.faceLost();
+      previous = null;
+      drift.length = 0;
       // A lost face is the same "nothing left to sample" case CLAUDE.md item
       // 51 already names: every duration this frame tracks is reset rather
       // than continuing to accumulate across a gap where nothing was
       // measured at all.
-      $("gate-line").textContent = "Bring your face into the frame.";
+      $("gate-line").textContent = face.status === "multiple"
+        ? "One face at a time — only the person being read should be in the frame."
+        : "Bring your face into the frame.";
       exposureHalo?.setCaptureState("seeking");
       updateCaptureGuideChips(null);
       hideAssistControls();
@@ -734,7 +750,14 @@ async function runCapture() {
 
     // ── the hold, gated through the assist guard so a burst can never
     // complete while the screen itself is the light source ────────────────
-    const held = latch.update(assist.gatesPassForHold(gates.pass) && captureSettled, nowMs);
+    const held = burstControl.frame({
+      ready: assist.gatesPassForHold(gates.pass) && captureSettled,
+      nowMs,
+      armContext: { margins: gates.margins, captureTier: gates.captureTier },
+      sample: () => Object.fromEntries(Object.entries(lastRois.rois)
+        .filter(([, roi]) => roi.pixels.length)
+        .map(([name, roi]) => [name, trimmedMedianLab(roi.pixels, color)])),
+    });
     exposureHalo?.setCaptureState(haloStateFromCapture({
       underexposed: isUnderexposed, gatesPass: gates.pass, captureSettled,
       recovering: refocusResult.recovering,
@@ -749,31 +772,19 @@ async function runCapture() {
       }));
     }
 
-    if (held.ready) {
-      diagnostics.recordMilestone("ready", nowMs);
-      collecting = BURST_FRAMES;
-      lastMargins = gates.margins;
-      lastTier = gates.captureTier;
-    }
+    if (held.collecting && held.collected === 1) diagnostics.recordMilestone("ready", nowMs);
 
-    if (collecting > 0) {
-      for (const [name, roi] of Object.entries(lastRois.rois)) {
-        if (!roi.pixels.length) continue;
-        (burst[name] ||= []).push(trimmedMedianLab(roi.pixels, color));
-      }
-      collecting--;
-      if (collecting === 0) {
-        diagnostics.recordMilestone("capture", nowMs);
-        diagnostics.setFinalCaptureMode(captureMode);
-        if (diagnostics.enabled) console.table(diagnostics.summary());
-        scheduler.stop();
-        activeCapture = null;
-        // The NEGOTIATED mode, not the one openCamera returned — that is
-        // "pending", and exposure may have been handed back mid-hold.
-        await finish(burst, lastRois, lastSclera, { ...opened, captureMode },
-          history, lastMargins, lastTier, image, pts, stats);
-        return;
-      }
+    if (held.done) {
+      diagnostics.recordMilestone("capture", nowMs);
+      diagnostics.setFinalCaptureMode(captureMode);
+      if (diagnostics.enabled) console.table(diagnostics.summary());
+      scheduler.stop();
+      activeCapture = null;
+      // The NEGOTIATED mode, not the one openCamera returned — that is
+      // "pending", and exposure may have been handed back mid-hold.
+      await finish(held.burst, lastRois, lastSclera, { ...opened, captureMode },
+        history, held.armContext.margins, held.armContext.captureTier, image, pts, stats);
+      return;
     }
 
     clearFrame();

@@ -26,7 +26,10 @@ import {
   negotiateCaptureMode, canNegotiateCaptureMode, exposureAssistState, releaseCaptureMode,
   ensureContinuousFocus, requestCameraRefocus,
 } from "../../qise/camera.js";
-import { createLandmarkerWithFallback } from "../../landmarker.js";
+import {
+  createLandmarkerWithFallback, selectSingleFace, SINGLE_FACE_NUM_FACES,
+} from "../../landmarker.js";
+import { BurstController, createMonotonicTimestamps } from "../../qise/capture-integrity.js";
 import { createFrameScheduler } from "../../qise/frame-scheduler.js";
 import { faceGuideRect } from "../../qise/frame-geometry.js";
 import {
@@ -274,7 +277,11 @@ async function buildLandmarker(runningMode = "VIDEO") {
   const built = await createLandmarkerWithFallback(
     guardedFactory,
     fileset,
-    { modelAssetPath: FACE_MODEL, runningMode, outputFaceBlendshapes: false },
+    {
+      modelAssetPath: FACE_MODEL, runningMode, outputFaceBlendshapes: false,
+      // Two, so a second person is visible and can be refused (M1a fix (a)).
+      numFaces: SINGLE_FACE_NUM_FACES,
+    },
     (message) => { if ($("gate-line")) $("gate-line").textContent = message; },
   );
   return built.landmarker;
@@ -373,7 +380,12 @@ async function runCapture() {
   let screenLightSince = null;
   let refocusStarted = false;
 
-  const latch = new GreenLatch();
+  // The hold AND the burst, in one pure state machine that resets on a lost
+  // face and re-gates every burst frame (src/qise/capture-integrity.js).
+  const burstControl = new BurstController();
+  // detectForVideo needs strictly increasing timestamps per landmarker, and a
+  // new landmarker is built per run, so a new sequence per run too.
+  const detectAt = createMonotonicTimestamps();
   const illuminationLatch = new GreenLatch(ILLUMINATION_READY_MS);
   // Locked decision 3, the other half: once the DARKNESS the assist was armed
   // for has been gone for a full hold's worth of time, this is the cue to turn
@@ -402,9 +414,7 @@ async function runCapture() {
   });
   let settleUntil = 0;
 
-  const burst = {};
-  let collecting = 0;
-  let lastSclera = null, lastRois = null, lastMargins = null, lastCaptureTier = null;
+  let lastSclera = null, lastRois = null;
 
   /**
    * Abandon a running screen-light session, wherever the loop noticed.
@@ -429,7 +439,7 @@ async function runCapture() {
     // The sequence changed the light on the face part-way through the hold, so
     // the seconds already banked are not seconds of the steady frame the latch
     // is meant to be measuring.
-    latch.reset();
+    burstControl.reset();
   };
 
   const stopAfterLoopError = (error) => {
@@ -492,8 +502,11 @@ async function runCapture() {
       image.data.fill(0);
       if (scratch) scratch.images = [];
     };
-    const result = landmarker.detectForVideo(video, nowMs);
-    const mesh = result && result.faceLandmarks && result.faceLandmarks[0];
+    const result = landmarker.detectForVideo(video, detectAt(nowMs));
+    // Exactly one face, or none at all: a second person is refused, never
+    // silently read in place of the first (M1a fix (a)).
+    const face = selectSingleFace(result);
+    const mesh = face.landmarks;
 
     if (mesh) {
       // z is carried through, not dropped. Without it `headPose` can only
@@ -568,7 +581,7 @@ async function runCapture() {
       if (observedScreenLightRevision !== screenLightRevision) {
         observedScreenLightRevision = screenLightRevision;
         screenLightSince = screenLightRequested ? nowMs : null;
-        latch.reset();
+        burstControl.reset();
       }
 
       // Auto-arm on DARKNESS ONLY — never on uneven light or softness, which
@@ -634,7 +647,7 @@ async function runCapture() {
       })) {
         modeNegotiationStarted = true;
         captureSettled = false;
-        latch.reset();
+        burstControl.reset();
         negotiateCaptureMode(opened.track)
           .then((negotiated) => {
             if (runId === captureRun) captureMode = negotiated.captureMode;
@@ -677,7 +690,7 @@ async function runCapture() {
             if (resumeScreenLightAfterIllumination && !screenLightDismissed) {
               setScreenLight(true);
             }
-            latch.reset();
+            burstControl.reset();
             $("illumination-state").hidden = false;
             $("illumination-state").textContent = "Colour response check complete";
             $("gate-line").textContent = "Screen-light check complete. Hold steady for the reading…";
@@ -717,7 +730,7 @@ async function runCapture() {
           showIlluminationPhase(illuminationSession.sequence[0]);
           $("illumination-state").hidden = false;
           $("illumination-state").textContent = "Colour response check · neutral";
-          latch.reset();
+          burstControl.reset();
         }
         clearFrame();
         scheduleStep();
@@ -734,7 +747,7 @@ async function runCapture() {
           && gates.failures.some((f) => f.id === "underexposed" || f.id === "overexposed")) {
         exposureReleaseStarted = true;
         captureSettled = false;
-        latch.reset();
+        burstControl.reset();
         releaseCaptureMode(opened.track)
           .then((reverted) => {
             if (runId !== captureRun) return;
@@ -760,39 +773,31 @@ async function runCapture() {
       // it is the light source, whatever the gates say — see
       // dropScreenLightLatch below, which is what actually gets the assist
       // back off again once ambient light alone looks sustainable.
-      const held = latch.update(gates.pass && captureSettled && !screenLightRequested, nowMs);
+      const held = burstControl.frame({
+        ready: gates.pass && captureSettled && !screenLightRequested,
+        nowMs,
+        settleUntil,
+        armContext: { margins: gates.margins, captureTier: gates.captureTier },
+        sample: () => Object.fromEntries(Object.entries(lastRois.rois)
+          .filter(([, roi]) => roi.pixels.length)
+          .map(([name, roi]) => [name, trimmedMedianLab(roi.pixels, color)])),
+      });
       $("ring-fill").setAttribute("stroke-dashoffset", String(100 - Math.round(held.progress * 100)));
       exposureHalo?.setCaptureState(haloStateFromCapture({
         underexposed, gatesPass: gates.pass, captureSettled, recovering: soft && refocusStarted,
       }), held.progress);
 
-      if (held.ready) {
-        if (nowMs < settleUntil) {
-          latch.reset();
-        } else {
-          collecting = BURST_FRAMES;
-          lastMargins = gates.margins;
-          lastCaptureTier = gates.captureTier;
-        }
-      }
-
-      if (collecting > 0) {
-        for (const [name, roi] of Object.entries(lastRois.rois)) {
-          if (!roi.pixels.length) continue;
-          (burst[name] ||= []).push(trimmedMedianLab(roi.pixels, color));
-        }
-        collecting--;
-        if (collecting === 0) {
-          // The NEGOTIATED mode, not the one openCamera returned — that is
-          // "pending" now, and if exposure was handed back part-way through
-          // the hold this reading was taken under "auto". The record has to
-          // say which, because captureMode is what tells a later baseline that
-          // the class of capture changed.
-          scheduler.stop();
-          await finish(burst, lastRois, lastSclera, { ...opened, captureMode },
-            history, lastMargins, illuminationSummary, lastCaptureTier, image, pts);
-          return;
-        }
+      if (held.done) {
+        // The NEGOTIATED mode, not the one openCamera returned — that is
+        // "pending" now, and if exposure was handed back part-way through
+        // the hold this reading was taken under "auto". The record has to
+        // say which, because captureMode is what tells a later baseline that
+        // the class of capture changed.
+        scheduler.stop();
+        await finish(held.burst, lastRois, lastSclera, { ...opened, captureMode },
+          history, held.armContext.margins, illuminationSummary, held.armContext.captureTier,
+          image, pts);
+        return;
       }
     } else {
       // The face is gone, so there is nothing left to sample and the wash must
@@ -805,7 +810,17 @@ async function runCapture() {
         });
         abandonIllumination(interruption.reason, nowMs);
       }
-      setCapturePrompt("Come into view", "Centre your face inside the oval.");
+      // Nothing measured on this frame may count towards the hold or survive
+      // into a burst, and the next face's motion is measured from scratch
+      // (M1a fix (b)).
+      burstControl.faceLost();
+      previous = null;
+      drift.length = 0;
+      if (face.status === "multiple") {
+        setCapturePrompt("One face at a time", "Only the person being read should be in the oval.");
+      } else {
+        setCapturePrompt("Come into view", "Centre your face inside the oval.");
+      }
       underexposedSince = null;
       softSince = null;
       refocusStarted = false;
@@ -925,8 +940,14 @@ async function runSelfie(file) {
       return;
     }
 
-    const result = landmarker.detect(canvas);
-    const mesh = result?.faceLandmarks?.[0];
+    const face = selectSingleFace(landmarker.detect(canvas));
+    if (face.status === "multiple") {
+      $("gate-line").textContent = "Choose a selfie with only your face in it.";
+      $("selfie-status").textContent = "More than one face was found. The selected photo was discarded.";
+      discardSelfieScratch();
+      return;
+    }
+    const mesh = face.landmarks;
     if (!mesh) {
       $("gate-line").textContent = "Choose a selfie with one full, front-facing face.";
       $("selfie-status").textContent = "No clear face was found. The selected photo was discarded.";

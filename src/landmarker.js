@@ -19,6 +19,18 @@
 export const DELEGATE_ORDER = ["GPU", "CPU"];
 
 /**
+ * How many faces every capture path asks MediaPipe for (M1a fix (a)).
+ *
+ * TWO, not one, and not because two faces are ever read. With `numFaces: 1`
+ * MediaPipe returns whichever face it ranks first and a second person in the
+ * frame is simply invisible, so it can never be refused. Asking for two is
+ * what makes "more than one face" observable; `selectSingleFace` then refuses
+ * it. Ported and generalised from codex/scanner-single-face (13ca956), which
+ * fixed the classic path only.
+ */
+export const SINGLE_FACE_NUM_FACES = 2;
+
+/**
  * Build a FaceLandmarker, falling back from GPU to CPU.
  *
  * @param {(fileset:any, opts:any)=>Promise<any>} createFromOptions
@@ -44,7 +56,9 @@ export async function createLandmarkerWithFallback(
       const landmarker = await createFromOptions(fileset, {
         baseOptions: { modelAssetPath: model.modelAssetPath, delegate },
         runningMode: model.runningMode || "IMAGE",
-        numFaces: 1,
+        // 1 by default for any caller that has not opted in; every capture
+        // path passes SINGLE_FACE_NUM_FACES so a second face is visible.
+        numFaces: model.numFaces ?? 1,
         // 52 blendshape coefficients. Used for EXPRESSION and ASYMMETRY only —
         // expression is a state at the moment of capture, never a personality
         // signal. See src/expression.js.
@@ -66,4 +80,21 @@ export async function createLandmarkerWithFallback(
   // hides the GPU error, which is usually the informative one.
   const detail = attempts.map((a) => `${a.delegate}: ${a.error}`).join(" | ");
   throw new Error(`Could not start the face model on this device. ${detail}`);
+}
+
+/**
+ * Classify a detector result without ever choosing a face implicitly.
+ *
+ * A reading is meaningful only when the image holds exactly one detected
+ * face. A status rather than a throw, because in a live loop "no face" and
+ * "two faces" are ordinary frame states, not errors.
+ *
+ * @param {{faceLandmarks?:Array<Array<any>>}|null|undefined} result
+ * @returns {{status:"none"|"single"|"multiple", landmarks:Array<any>|null}}
+ */
+export function selectSingleFace(result) {
+  const faces = Array.isArray(result?.faceLandmarks) ? result.faceLandmarks : [];
+  if (faces.length === 0) return { status: "none", landmarks: null };
+  if (faces.length > 1) return { status: "multiple", landmarks: null };
+  return { status: "single", landmarks: faces[0] };
 }

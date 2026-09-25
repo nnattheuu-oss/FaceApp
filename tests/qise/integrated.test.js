@@ -157,13 +157,15 @@ test("a missing capture region is allowed and results in an unmeasured palace", 
 
 test("the accepted frame reaches integration before capture teardown erases it", () => {
   const source = readFileSync(new URL("../../src/ui/qise/app.js", import.meta.url), "utf8");
-  const start = source.indexOf("if (collecting === 0)");
+  // Anchored on the BurstController completion branch since M1a (the inline
+  // `collecting` counter it used to find no longer exists). Same invariant.
+  const start = source.indexOf("if (held.done)");
   const end = source.indexOf("return;", start);
   const completion = source.slice(start, end);
   assert.ok(start >= 0 && end > start, "capture completion branch not found");
   assert.doesNotMatch(completion, /clearFrame\s*\(/,
     "the accepted frame was erased before its structural reading ran");
-  assert.match(completion, /lastCaptureTier, image, pts/,
+  assert.match(completion, /captureTier,\s*image, pts\)/,
     "the accepted frame and map do not reach the integration boundary");
 });
 
