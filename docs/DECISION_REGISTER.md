@@ -723,9 +723,78 @@ Use this register to stop prompts, discussions and implementation from collapsin
 - **Evidence:** `node scripts/run-tests.js` → 1428 pass / 0 fail on the M0 head; `npm run build`; `npm run lint:bundle`; `node scripts/billing-falsify.mjs` (13/13 caught).
 - **Supersedes:** nothing substantive. It records the integration of already-approved work.
 
+### DR-2026-09-25-FACE-NEVER-LEAVES-DEVICE
+
+- **Status:** approved by the product owner, 25 September 2026 (Phase 0 ruling on L-09).
+- **Decision:** L-09 ("No user data leaves the device in v1. No analytics SDK, no crash reporter, no backend") is **superseded**. The invariant becomes: **your face never leaves your device.**
+  - Face pixels, landmarks and measurements are never uploaded.
+  - Pixels and landmarks are never persisted (the Daily Portrait display-frame exception of DR-2026-09-09-CARDS-1-2 is unchanged).
+  - Purchases are verified off the device.
+  - **Permitted egress:** store purchase token, anonymous RevenueCat app-user ID and product ID, sent to the store and to RevenueCat only. Nothing else.
+  - Analytics stays governed by Card 9 (see the proposal below).
+- **Why:** Play refunds any purchase not acknowledged within 72 hours, and the Digital Goods API has no client-side acknowledge (v1 finding B-1). Under L-09 no route could collect money.
+- **Consequences:**
+  - The user-facing copy and the store privacy forms change **in the same build that ships RevenueCat** (M1c), never before, so the forms match the binary. See `docs/MONETISATION_AUDIT_2026-09.md` D4 §5.
+  - The egress allowlist in `scripts/lint-bundle.js` gains the RevenueCat hosts only.
+- **Supersedes:** L-09 of `DR-2026-09-23-LAUNCH-V1`.
+
+### DR-2026-09-25-DUAL-STORE-REVENUECAT
+
+- **Status:** approved by the product owner, 25 September 2026.
+- **Decision:**
+  1. **Dual-store.** Google Play first (M1). The iOS App Store second (M2), via the same Capacitor shell and StoreKit 2. **RevenueCat is the single entitlement model**, with anonymous app-user IDs.
+  2. **The web PWA is a free funnel and backup channel and never a purchase path.**
+  3. The Lemon Squeezy / web-checkout route is rejected.
+  4. **L-01 is amended, not overturned:** "Play first; iPhone reached via the App Store (iOS shell, StoreKit 2) as M2; web PWA free funnel/backup, never the purchase path." The AU/NZ/UK/CA market list and the EU and US exclusions are unchanged.
+  5. **L-03 is superseded** as to prices, tiers and trial. D4 of the monetisation audit sets them (see the CATALOGUE-PRICING proposal).
+  6. The M2 iOS plan carries a Guideline 4.3(b) defence and a **two-strike kill**: two 4.3(b) rejections after repositioning mean iOS is parked and Play revenue kept.
+- **Engineering consequence:** RevenueCat has no supported Trusted Web Activity path. Its staff contradict each other on whether its REST API acknowledges Play purchases made outside its SDK. M1c therefore uses a Capacitor Android shell with `@revenuecat/purchases-capacitor`, whose native SDK acknowledges on-device. That resolves v1 B-1, B-2 and B-3. `android/twa-manifest.template.json` is superseded at M1c.
+- **Evidence:** `docs/MONETISATION_AUDIT_2026-09.md` (Phase 0, D4 §3).
+- **Supersedes:** L-01 (amended) and L-03 (prices, tiers, trial) of `DR-2026-09-23-LAUNCH-V1`.
+
+### DR-2026-09-25-RETENTION-STREAK-REMINDER
+
+- **Status:** approved by the product owner, 25 September 2026.
+- **Decision:**
+  - **(a)** A **guilt-free streak** may ship. It is shown as a count ("N scans this week"), with no loss state, no broken-streak copy, and a missed day still a gap.
+  - **(b)** An **opt-in `.ics` calendar reminder** is offered on the paywall. It is client-generated, carries no data off the device, and its content is the deep link only. Capacitor local notifications are the M3 upgrade under the same opt-in.
+  - **(c)** One **genuine, once-per-install, 24-hour discount** after the first dismiss of the hard offer. The window is real and never reset.
+- **Still prohibited** (the retention contract's list otherwise stands): streak-loss framing, fear-based urgency, fake or resetting countdowns, loot boxes, fabricated scarcity, shame or guilt for a missed day.
+- **Supersedes:** L-08's "No streaks" line, and the retention contract's no-notification direction (`docs/RETENTION_EXPERIENCE_CONTRACT.md`, "No-notification direction is preserved"), which that contract says needs exactly this kind of register decision to reopen.
+
 ## Unresolved proposals
 
 These must not be implemented as settled decisions without approval:
+
+### Proposed 25 September 2026 (monetisation audit). Owner approval required; each is listed in D6.
+
+- **DR-2026-09-25-CATALOGUE-PRICING (proposed).**
+  - Primary product: annual "Full Reading" at A$79.99 / US$49.99.
+  - Monthly A$14.99 as a price anchor.
+  - Two-face compatibility at A$9.99, included for annual subscribers.
+  - "Ask the Mirror" credits: first answer free, then 5 for A$4.99 or 20 for A$14.99. Deterministic, $0 inference.
+  - First-year discounted annual at A$49.99, offered only in the genuine 24-hour window.
+  - No lifetime product at launch. No weekly plan.
+  - Trial: the no-trial arm A at launch; the 7-day-trial arm B after 500 paywall views; decided by net revenue per paywall view.
+  - Source: `docs/MONETISATION_AUDIT_2026-09.md` D4 §1–2.
+- **DR-2026-09-25-STORE-ARTEFACT-SCOPE (proposed).**
+  - Store builds exclude the classic path, `/beta/` and Module B (`MODULE_B_SAFETY_REFERRALS=false`), by build flag rather than deletion, so the classic tests stay green.
+  - `MODULE_B_IS_NEVER_MONETISED` stays.
+  - `src/terms.html`'s false "science screen one tap from every reading" claim is corrected.
+  - Resolves v1 B-5/B-6 and the capture-screen triage row.
+- **DR-2026-09-25-REFLECTION-PUBLIC-DEFAULT (proposed).**
+  - Supersedes `DR-2026-08-17-REFLECTION-ENGINE-INTERNAL-DEFAULT` and resolves v1 STOP-1.
+  - That record's only stated gate was the heritage rights gates, which L-05 moved to research-track.
+  - The production origin is added **by name** to `src/qise/reading-flags.js`'s allowlist, never by defaulting on.
+- **DR-2026-09-25-RELEASE-CHECK-L05 (proposed).** `scripts/check-release.js` treats provenance families presented under the L-05 label as non-blocking. `auditContentProvenance` remains as a report.
+- **DR-2026-09-25-ANALYTICS-CARD-9 (proposed).** Resolves Card 9 and supersedes `docs/ZKT_TELEMETRY_SCOPE.md`:
+  - No first-party telemetry at M1. Funnel data comes from Play Console and RevenueCat.
+  - Fallback: six day-bucketed, identifier-free counters to a stateless worker, only if RevenueCat cannot report paywall views. The fallback needs its own approval.
+- **DR-2026-09-25-COMPAT-REMOTE-FIRST (proposed).**
+  - Two-face compatibility launches with **remote derived tokens only**: each person scans their own face on their own phone.
+  - The in-person (friend's face on your phone) path is held until legal item L10 is answered.
+  - Source: audit D4 §4.
+
 
 - A strict rolling 90-day TTL for derived IndexedDB history. Reconcile it with the existing baseline window, migration, user controls and deletion semantics first.
 - React/Vite migration. If approved, explicitly solve GitHub Pages base paths and MediaPipe WASM/asset resolution; this is not a current-stack bug.

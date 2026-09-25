@@ -10,6 +10,8 @@ this record did not resolve: `docs/LAUNCH_V1_AUDIT.md`.
 ---
 
 ## L-01 Platform and markets
+> **Amended 25 Sep 2026 by DR-2026-09-25-DUAL-STORE-REVENUECAT:** Play first; iPhone via the App Store (iOS shell, StoreKit 2) as M2; the web PWA is a free funnel, never a purchase path. The markets and exclusions below are unchanged.
+
 - **Decision:** Google Play only (TWA via Bubblewrap). Countries: **Australia, New Zealand, United Kingdom, Canada.**
 - **Excluded for v1:** all EU/EEA countries, United States, everything else.
 - **Why:** EU exclusion removes EU AI Act Art 50/Art 5 exposure for v1. US exclusion removes state App Store Accountability Act obligations (Texas law in force since the Fifth Circuit stayed the injunction, June 2026; fines up to US$10,000 per violation) until age-signal handling is built.
@@ -20,7 +22,7 @@ this record did not resolve: `docs/LAUNCH_V1_AUDIT.md`.
 - Target audience: **18+ only**. App is not designed for or marketed to children.
 - Play category: **Entertainment.**
 
-## L-03 Monetisation (supersedes the monetisation doc TL;DR, which contradicts its own decision table)
+## L-03 Monetisation (SUPERSEDED as to prices, tiers and trial by DR-2026-09-25-DUAL-STORE-REVENUECAT; proposed replacement DR-2026-09-25-CATALOGUE-PRICING) (supersedes the monetisation doc TL;DR, which contradicts its own decision table)
 | Product ID | Type | Base price | Billing |
 |---|---|---|---|
 | `spiritmaxx_full_reading_lifetime` | In-app product (non-consumable) | AUD 34.99 | One time |
@@ -58,11 +60,15 @@ Evidence-strength of the heritage claim is NOT a v1 gate (covered by L-05 labell
 - If Module A (`src/reading/*`) ships, all its strings must pass L-06. Its 26 evidence-deficient claims are not blockers under L-05.
 
 ## L-08 Qi Se
+> **Amended 25 Sep 2026 by DR-2026-09-25-RETENTION-STREAK-REMINDER:** a guilt-free streak (count only, no loss state) is permitted. Loss-guilt and cross-user comparison remain prohibited.
+
 - Within-subject only: compared with the user's own previous scans. Never a score, never health, never "better/worse".
 - In-app lighting caveat required (copy in 03).
 - No streaks, no loss-guilt, no comparison with other users.
 
 ## L-09 Data
+> **SUPERSEDED 25 Sep 2026 by DR-2026-09-25-FACE-NEVER-LEAVES-DEVICE:** your face never leaves your device; purchase token, anonymous ID and product ID may go to the store and RevenueCat. The text below is the historical record.
+
 - **No user data leaves the device in v1.** No analytics SDK, no crash reporter, no backend.
 - Funnel metrics come from Play Console (store listing conversion, installs) and Play order reports only.
 - If the repo currently makes any network call carrying user data → agent STOPs.

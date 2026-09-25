@@ -32,6 +32,9 @@ states get meaning-preserving variation, not cosmetic variation mistaken for it)
 
 ## Prohibited retention mechanics
 
+> **Amended 25 Sep 2026 by DR-2026-09-25-RETENTION-STREAK-REMINDER.** Now permitted: a guilt-free streak (a count, no loss state), an opt-in `.ics`/local-notification reminder, and one genuine once-per-install 24-hour discount. Everything in the list below still stands; a real, non-resetting window is not a "manipulative countdown".
+
+
 None of the following may ship, in any tier, on any surface:
 
 - streak loss or "don't break your streak" framing;

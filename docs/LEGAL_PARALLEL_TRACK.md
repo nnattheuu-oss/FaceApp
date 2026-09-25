@@ -79,3 +79,23 @@ We need confirmation, not analysis. Our positions:
 ## L6. General Wellness posture
 
 - **Question:** Review the safety-gate copy for compliance with the "General Wellness" product posture to ensure it does not imply a clinical diagnosis or medical recommendation.
+
+## L7. EU AI Act Art. 50(3) — physiognomy as biometric categorisation (added 25 Sep 2026)
+
+- **Question:** Does assigning Five Elements types, section and palace readings from face landmarks make the app a "biometric categorisation system" (Art. 3(40); recital 16 lists "behavioural or personality traits")? If so, what first-exposure notice satisfies Art. 50(3)?
+- **Conservative default until answered:** EU and EEA stay excluded at store level (L-01). The re-entry package is an Art. 50(3) notice plus blendshapes kept off (already off on the qise path).
+
+## L8. Kanripo CC BY-SA quotation in a paid product (added 25 Sep 2026; v1 B-10, Card 11)
+
+- **Question:** Can short quoted lines from the Kanripo KR3g0043–0046 transcriptions appear in a paid product with attribution? Does share-alike attach to the reading copy around them?
+- **Decision rule (owner, 25 Sep 2026):** if CC BY-SA cannot be satisfied with attribution + share-alike, the affected passages fall back to app-authored interpretation under the L-05 label. Executed by the heritage agent.
+
+## L9. RevenueCat as an overseas processor — APP 8 (added 25 Sep 2026)
+
+- **Question:** Is an anonymous app-user ID plus a purchase token "personal information" under the Privacy Act? If it is, what APP 8.1 steps apply to disclosing it to a US processor?
+- **Conservative default:** name RevenueCat and the US transfer in `src/privacy.html`, and provide a deletion route (RevenueCat customer deletion).
+
+## L10. Processing a non-user's face for two-face compatibility (added 25 Sep 2026)
+
+- **Question:** Scanning a friend's face on the user's phone processes a non-user's biometric data. What consent satisfies APP 3 (sensitive information) and UK GDPR Art. 9?
+- **Conservative default:** launch **remote-token compatibility only**. Each person scans their own face on their own device; only derived tokens are shared (proposed DR-2026-09-25-COMPAT-REMOTE-FIRST). The in-person path and any listing claim for it are held until this is answered.
