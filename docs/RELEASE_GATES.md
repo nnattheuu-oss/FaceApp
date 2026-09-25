@@ -4,6 +4,14 @@
 
 ---
 
+## GATE 0 — HUMAN OWNER SMOKE TEST (blocking; owner directive, 25 September 2026)
+
+**Human owner smoke test of merged `main` on a real device is a blocking gate for any store submission; automated tests alone never satisfy it.**
+
+As of 25 September 2026 the owner has never run this app. No manual run of the scanner, the boot flow, the paywall or the readings has happened, on any device. No gate in this file, or in `docs/STORE_RELEASE_GATES.md`, may be marked green on automated evidence alone.
+
+---
+
 ## GATE 1 — FULL PRODUCT (the target)
 
 **Qi Se measurement + personal history + Heritage + Reflection Engine.**
