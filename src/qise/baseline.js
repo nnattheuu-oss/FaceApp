@@ -34,8 +34,23 @@ export const BASELINE_WINDOW = 30;
 /** Most recent readings held OUT of the baseline. */
 export const BASELINE_EXCLUDE_RECENT = 3;
 
-/** Readings 1..3 are `calibrating` — there is nothing to compare against yet. */
+/**
+ * interpretReading needs at least this many PRIOR valid readings before it
+ * tries a baseline at all. Not the whole story: see ANCHOR_READINGS.
+ */
 export const CALIBRATING_READINGS = 3;
+
+/**
+ * How many readings calibrate before the FIRST personal comparison, as the
+ * engine actually behaves (M1a row 15). interpretReading needs
+ * CALIBRATING_READINGS prior readings, and computeBaseline holds out the
+ * BASELINE_EXCLUDE_RECENT most recent ones, so it needs one more beyond
+ * those: with 3 and 3 that is readings 1-4, and reading 5 is the first
+ * comparison. Every anchor count on screen derives from this, never from a
+ * literal — a literal 4 read as "compare on the fourth" is what broke the
+ * calibration copy. tests/qise/anchor-count.test.js pins it to the engine.
+ */
+export const ANCHOR_READINGS = Math.max(CALIBRATING_READINGS, BASELINE_EXCLUDE_RECENT + 1);
 
 /** MADs an axis must clear to be named. */
 export const NOISE_FLOOR_MADS = 2;

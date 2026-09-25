@@ -9,7 +9,7 @@
 import { PALETTE, COLOUR_ORDER } from "./palette.js";
 import { sealModel, sealSvg } from "./seal.js";
 import { passageFor } from "../../qise/passages.js";
-import { isLowConfidence } from "../../qise/baseline.js";
+import { isLowConfidence, ANCHOR_READINGS } from "../../qise/baseline.js";
 import { compositionOf, COMPOSITION_COLOURS } from "../../qise/composition.js";
 import { PALACE_INTERPRETATIONS } from "../../reading/palace-interpretations.js";
 
@@ -321,24 +321,26 @@ export function calibrationModel(reading, history) {
   const stored = Number.isInteger(reading?.baselineProgress) ? reading.baselineProgress : null;
   const atReading = (history || []).filter((item) => item?.valid !== false
     && (!reading?.timestampIso || String(item.timestampIso) <= String(reading.timestampIso))).length;
-  const current = Math.max(1, Math.min(4, stored || atReading));
-  const remaining = Math.max(0, 4 - current);
-  const headings = [
-    "Your pattern starts with one mark.",
-    "The outline is taking shape.",
-    "One more anchor scan will reveal change.",
-    "Your personal pattern is ready.",
-  ];
+  const required = ANCHOR_READINGS;
+  const current = Math.max(1, Math.min(required, stored || atReading));
+  // Scans until the first personal comparison, counting that scan itself: the
+  // comparison is the scan AFTER the last anchor (M1a row 15).
+  const remaining = required - current + 1;
+  const title = current === required
+    ? "Your anchors are set."
+    : current === required - 1
+      ? "One more anchor scan completes the outline."
+      : current === 1 ? "Your pattern starts with one mark." : "The outline is taking shape.";
   return {
     active: !reading?.compass,
     current,
-    required: 4,
+    required,
     remaining,
-    progress: current / 4,
-    title: headings[current - 1],
-    verdict: remaining
-      ? `Today is anchor ${current} of 4 — a real reading, before personal comparison begins.`
-      : "Your personal comparison is ready.",
+    progress: current / required,
+    title,
+    verdict: current === required
+      ? `Today is anchor ${current} of ${required}. Your next scan is your first personal comparison.`
+      : `Today is anchor ${current} of ${required} — a real reading, before personal comparison begins.`,
     reflection: "What would be worth noticing if this pattern shifted?",
     story: "In Mian Xiang, facial colour was regarded as changing appearance rather than a fixed trait. This first impression records what the camera could see today; similar light on later scans helps separate a pattern from the room.",
   };

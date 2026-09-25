@@ -50,7 +50,9 @@ import {
 } from "../../qise/gates.js";
 import { frameStats } from "../../qise/framestats.js";
 import { computeReadingMetrics, lumRatioP90P50 } from "../../qise/metrics.js";
-import { interpretReading, readingConfidence, axesOf, planSegment, BASELINE_VERSION } from "../../qise/baseline.js";
+import {
+  interpretReading, readingConfidence, axesOf, planSegment, BASELINE_VERSION, ANCHOR_READINGS,
+} from "../../qise/baseline.js";
 import { passageFor } from "../../qise/passages.js";
 import { reflectionMode } from "../../qise/reading-flags.js";
 import { reflectionFor } from "../../qise/reading-pipeline.js";
@@ -1138,7 +1140,7 @@ async function finish(burst, rois, sclera, opened, history, gateMargins, illumin
     baselineVersion: BASELINE_VERSION,
     captureTier,
     readingState: interpreted.state,
-    baselineProgress: Math.min(4, history.filter((item) => item && item.valid !== false).length + 1),
+    baselineProgress: Math.min(ANCHOR_READINGS, history.filter((item) => item && item.valid !== false).length + 1),
     consentVersion: consent.read() && consent.read().version,
     illumination,
     // The margins from the frame that opened the burst. gates.js normalises
@@ -1638,9 +1640,9 @@ async function renderReading(reading) {
   progress.innerHTML = m.calibration.active
     ? `<p class="eyebrow">Building your baseline</p><h2 id="pattern-progress-h">${esc(m.calibration.title)}</h2>
        <p class="muted">${m.calibration.remaining === 1 ? "One more comparable scan" : `${m.calibration.remaining} more comparable scans`} will unlock your first personal change reading.</p>
-       <div class="pattern-dots" aria-label="${m.calibration.current} of 4 anchor readings">${Array.from({ length: 4 }, (_, index) =>
+       <div class="pattern-dots" aria-label="${m.calibration.current} of ${m.calibration.required} anchor readings">${Array.from({ length: m.calibration.required }, (_, index) =>
          `<span class="pattern-dot" data-filled="${index < m.calibration.current}"></span>`).join("")}</div>
-       <div class="pattern-count num">${m.calibration.current} / 4 anchors</div>`
+       <div class="pattern-count num">${m.calibration.current} / ${m.calibration.required} anchors</div>`
     : "";
   $("pattern-range").hidden = m.calibration.active;
   $("reading-spark").hidden = m.calibration.active;

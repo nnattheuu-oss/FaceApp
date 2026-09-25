@@ -121,7 +121,7 @@ export function shareCardModel(history, cadence = "today", { entitlement = null 
     caption: key === "today" && newest
       ? (newest.compass
         ? "A private reflection on what shifted today."
-        : "One mark. Three more to reveal what changes.")
+        : "An anchor mark. Personal change is read once the anchors are set.")
       : "A private column, built one reading at a time.",
     privacyLine: "Made on-device · no face photo shared · compared only with your own scans",
     footer: "Mien Shiang · cultural entertainment, not a health assessment",
