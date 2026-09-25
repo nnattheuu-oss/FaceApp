@@ -61,7 +61,7 @@ test("a genuinely measured failure still gets its own instruction (paired contro
 
 test("ui/qise/app.js no longer prints a raw gate message on the selfie path", () => {
   const source = readFileSync(new URL("../../src/ui/qise/app.js", import.meta.url), "utf8");
-  const body = source.match(/async function runSelfie\([\s\S]*?\n}\n/)?.[0] || "";
+  const body = source.match(/async function runSelfie\([\s\S]*?\r?\n}\r?\n/)?.[0] || "";
   assert.ok(body);
   assert.doesNotMatch(body, /failures\[0\]\.message/);
   assert.match(body, /selfieGateMessage\(gates\)/);

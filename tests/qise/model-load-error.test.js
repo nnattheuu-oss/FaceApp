@@ -67,7 +67,7 @@ test("ui/qise/app.js routes selfie failures through describeSelfieError", () => 
 
 test("ui/qise/app.js builds every landmarker through loadFaceModel", () => {
   const source = readFileSync(new URL("../../src/ui/qise/app.js", import.meta.url), "utf8");
-  const body = source.match(/async function buildLandmarker\([\s\S]*?\n}\n/)?.[0] || "";
+  const body = source.match(/async function buildLandmarker\([\s\S]*?\r?\n}\r?\n/)?.[0] || "";
   assert.ok(body, "buildLandmarker not found");
   assert.match(body, /loadFaceModel\(/,
     "a raw model failure falls through to the camera-permission message");

@@ -76,7 +76,7 @@ test("the selfie screen offers the toggle, OFF by default", () => {
 
 test("ui/qise/app.js draws the selfie through drawSelfie with the toggle's value", () => {
   const source = readFileSync(new URL("../../src/ui/qise/app.js", import.meta.url), "utf8");
-  const body = source.match(/async function runSelfie\([\s\S]*?\n}\n/)?.[0] || "";
+  const body = source.match(/async function runSelfie\([\s\S]*?\r?\n}\r?\n/)?.[0] || "";
   assert.ok(body, "runSelfie not found");
   assert.match(body, /drawSelfie\(ctx, decoded\.source,[^)]*mirrored: \$\("selfie-mirrored"\)\.checked/);
   assert.doesNotMatch(body, /ctx\.drawImage\(decoded\.source/,

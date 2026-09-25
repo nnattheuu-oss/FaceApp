@@ -149,13 +149,21 @@ for (const f of files) {
 for (const m of MUTATIONS) {
   const path = join(ROOT, m.file);
   const original = readFileSync(path, "utf8");
-  if (!original.includes(m.find)) {
+  // A Windows checkout (core.autocrlf=true, no .gitattributes) holds these
+  // files as CRLF, and a multi-line `find` written with "\n" then matches
+  // nothing: M3, M8, M9 and M12 all reported "the record has drifted" on a
+  // tree that had not drifted at all. Speak the file's own line ending. The
+  // restore below still writes `original` back byte for byte.
+  const eol = original.includes("\r\n") ? "\r\n" : "\n";
+  const find = m.find.replace(/\r?\n/g, eol);
+  const replacement = m.replace.replace(/\r?\n/g, eol);
+  if (!original.includes(find)) {
     console.log(`FAIL ${m.id}: search string not found in ${m.file} -- the record has drifted`);
     ok = false;
     continue;
   }
   try {
-    writeFileSync(path, original.replace(m.find, m.replace));
+    writeFileSync(path, original.replace(find, replacement));
     const r = run(m.test);
     const caught = r.failed.some((name) => name.includes(m.expect));
     console.log(`${caught ? "CAUGHT" : "MISSED"} ${m.id} -> ${caught ? `"${m.expect}"` : `failed: ${JSON.stringify(r.failed)}`}`);
