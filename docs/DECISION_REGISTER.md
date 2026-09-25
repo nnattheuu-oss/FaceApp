@@ -793,6 +793,32 @@ Use this register to stop prompts, discussions and implementation from collapsin
   - The in-person path, **and the compatibility store listing**, are held until legal item L10 is resolved.
 - **Release gate unchanged by any of these:** Gate 0 in `docs/RELEASE_GATES.md` (the owner's personal real-device smoke test of merged `main`) still blocks every store submission.
 
+### DR-2026-09-25-VENDOR-PRECACHE
+
+- **Status:** implemented in M1a fix (d) under the owner's 25 September 2026 M1a authorisation, which asked for this record. It is an engineering decision within that authorisation and changes no product, copy or policy commitment. It is reversible by editing `src/sw.js`.
+- **Problem (Phase 0 item 5, `docs/MONETISATION_AUDIT_2026-09.md`).**
+  - The vendored MediaPipe bundle, WASM runtime and 3.7 MB face model were cached only on first fetch, into the shell cache `CACHE`.
+  - The activate handler deletes every cache except `CACHE`, so **every release evicted the model**. The next offline scan then failed, and the failure was reported as a camera-permission problem.
+  - Separately, 23 modules in the static import graphs of `ui/qise/app.js` and `ui.js` were missing from `SHELL` on `main` at `93e1796`. Scripts are network-first, so only an offline launch showed it: as a module-not-found.
+- **Decision.**
+  - `src/sw.js` precaches the bundle, the **SIMD** runtime (`vision_wasm_internal.js` + `.wasm`) and the face model on install. They go into `VENDOR_CACHE`, a cache named for the pin: `mienshiang-vendor-<tasks-vision version>-<model SHA-256 prefix>`.
+  - Activate keeps both `CACHE` and `VENDOR_CACHE`, so a shell release no longer evicts the model.
+  - Vendor URLs are served cache-first. Under one pin nothing can change, so there is nothing to revalidate.
+  - The no-SIMD pair (another 9.6 MB) is **not** precached. If a device requests it, the fetch handler keeps it in `VENDOR_CACHE` on first use.
+  - Install stays per-item (`Promise.allSettled`), so a failed vendor download costs only itself and never the shell.
+  - The missing 23 modules are added to `SHELL`. `CACHE` bumps to `mienshiang-v27`, and `index.html` redirects to `?v=27` (CLAUDE.md item 15).
+  - Model-load failures now surface as `ModelLoadError` with their own copy (`describeCameraError`, `describeSelfieError` in `src/qise/camera.js`).
+- **Cost accepted.** The first install downloads about 13.5 MB more in the background. A first visit that scans before the worker has claimed the page can fetch the model twice. **Estimate:** that happens once per device at most.
+- **Pinned by:**
+  - `tests/sw-precache.test.js`, which runs `sw.js` in a vm and checks:
+    - the import graph is covered by `SHELL`;
+    - the vendor list matches `scripts/build.js`;
+    - the cache name carries the version and model-hash pins;
+    - the vendor cache survives activation (verified to fail with the old filter reinstated).
+  - `tests/qise/model-load-error.test.js`.
+  - `tests/source-integrity.test.js`'s SHELL-exists check, now scoped to the `SHELL` array.
+- **If the MediaPipe pin changes,** `VENDOR_CACHE` must change with it. The test fails if it does not.
+
 ## Unresolved proposals
 
 These must not be implemented as settled decisions without approval:

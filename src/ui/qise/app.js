@@ -21,8 +21,8 @@ import {
 } from "../../qise/consent.js";
 import { paletteCss } from "./palette.js";
 import {
-  openCamera, attachCameraPreview, describeCameraError, createLandmarkerGuarded,
-  releaseCapture, GreenLatch, PolygonSmoother, BURST_FRAMES, trimmedMedianLab, reduceBurst,
+  openCamera, attachCameraPreview, describeCameraError, describeSelfieError, loadFaceModel,
+  createLandmarkerGuarded, releaseCapture, GreenLatch, PolygonSmoother, BURST_FRAMES, trimmedMedianLab, reduceBurst,
   negotiateCaptureMode, canNegotiateCaptureMode, exposureAssistState, releaseCaptureMode,
   ensureContinuousFocus, requestCameraRefocus,
 } from "../../qise/camera.js";
@@ -269,23 +269,27 @@ function illuminationOrderBit() {
 async function buildLandmarker(runningMode = "VIDEO") {
   // Dynamic, and only ever reached past the consent assertion.
   assertConsentGranted(consent, "FaceLandmarker");
-  const { FaceLandmarker, FilesetResolver } = await import(MEDIAPIPE_BUNDLE);
-  const fileset = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM);
-  const guardedFactory = (_resolvedFileset, options) => createLandmarkerGuarded({
-    consent, options,
-    factory: (guardedOptions) => FaceLandmarker.createFromOptions(fileset, guardedOptions),
+  // Every fetch that can fail offline sits inside loadFaceModel, so a failure
+  // reads as a model problem and not as a camera-permission one (M1a fix (d)).
+  return loadFaceModel(async () => {
+    const { FaceLandmarker, FilesetResolver } = await import(MEDIAPIPE_BUNDLE);
+    const fileset = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM);
+    const guardedFactory = (_resolvedFileset, options) => createLandmarkerGuarded({
+      consent, options,
+      factory: (guardedOptions) => FaceLandmarker.createFromOptions(fileset, guardedOptions),
+    });
+    const built = await createLandmarkerWithFallback(
+      guardedFactory,
+      fileset,
+      {
+        modelAssetPath: FACE_MODEL, runningMode, outputFaceBlendshapes: false,
+        // Two, so a second person is visible and can be refused (M1a fix (a)).
+        numFaces: SINGLE_FACE_NUM_FACES,
+      },
+      (message) => { if ($("gate-line")) $("gate-line").textContent = message; },
+    );
+    return built.landmarker;
   });
-  const built = await createLandmarkerWithFallback(
-    guardedFactory,
-    fileset,
-    {
-      modelAssetPath: FACE_MODEL, runningMode, outputFaceBlendshapes: false,
-      // Two, so a second person is visible and can be refused (M1a fix (a)).
-      numFaces: SINGLE_FACE_NUM_FACES,
-    },
-    (message) => { if ($("gate-line")) $("gate-line").textContent = message; },
-  );
-  return built.landmarker;
 }
 
 async function runCapture() {
@@ -1871,7 +1875,7 @@ async function boot() {
     const [file] = input.files || [];
     runSelfie(file).catch((error) => {
       console.error(error);
-      $("selfie-status").textContent = "That selfie could not be read. Choose another original photo.";
+      $("selfie-status").textContent = describeSelfieError(error);
     }).finally(() => { input.value = ""; });
   });
   $("go-capture").addEventListener("click", () => runCapture().catch((error) => {

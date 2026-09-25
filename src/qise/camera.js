@@ -104,9 +104,42 @@ export async function requestCameraRefocus(track, { settleMs = 450, wait = sleep
   }
 }
 
+/**
+ * The face model (bundle, WASM runtime or model file) did not load, or no
+ * delegate could run it. Distinct from every camera error on purpose: the
+ * camera opened and the permission is fine, so describeCameraError's
+ * permission advice is the wrong fix (M1a fix (d)).
+ */
+export class ModelLoadError extends Error {
+  constructor(cause) {
+    super("The face model did not load", { cause });
+    this.name = "ModelLoadError";
+  }
+}
+
+/**
+ * Run the landmarker build step and tag any failure as a ModelLoadError. A
+ * consent refusal passes through untouched: that is a gate doing its job,
+ * not a load failure, and it must keep its own type.
+ * @template T
+ * @param {()=>Promise<T>} step
+ * @returns {Promise<T>}
+ */
+export async function loadFaceModel(step) {
+  try {
+    return await step();
+  } catch (error) {
+    if (error?.name === "ConsentRequiredError" || error instanceof ModelLoadError) throw error;
+    throw new ModelLoadError(error);
+  }
+}
+
 /** Turn browser camera errors into a useful next action rather than a dead preview. */
 export function describeCameraError(error) {
   const name = error?.name || "";
+  if (name === "ModelLoadError") {
+    return "The face reader did not load. Your camera is fine. Check your connection, then tap Restart camera.";
+  }
   if (name === "NotAllowedError" || name === "PermissionDeniedError") {
     return "Camera access is off. Allow it in this site's settings, or choose a selfie below.";
   }
@@ -123,6 +156,14 @@ export function describeCameraError(error) {
     return "The camera needs a secure page. Open the HTTPS link, or choose a selfie below.";
   }
   return "The camera did not open. Retry, check this site's camera permission, or choose a selfie below.";
+}
+
+/** The selfie path needs the same model; a load failure is not a bad photo. */
+export function describeSelfieError(error) {
+  if (error?.name === "ModelLoadError") {
+    return "The face reader did not load. Your photo is fine. Check your connection, then choose it again.";
+  }
+  return "That selfie could not be read. Choose another original photo.";
 }
 
 /**
