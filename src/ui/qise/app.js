@@ -28,6 +28,7 @@ import {
 } from "../../qise/camera.js";
 import { createLandmarkerWithFallback } from "../../landmarker.js";
 import { createFrameScheduler } from "../../qise/frame-scheduler.js";
+import { faceGuideRect } from "../../qise/frame-geometry.js";
 import {
   fitSelfieDimensions, validateSelfieDimensions, validateSelfieFile,
 } from "../../qise/upload.js";
@@ -41,7 +42,7 @@ import {
 } from "../../qise/illumination.js";
 import { createScreenWakeLock } from "../../qise/wakelock.js";
 import {
-  evaluateGates, captureGuide, captureInstruction, canUseCurrentLight,
+  evaluateGates, captureGuide, captureInstruction, canUseCurrentLight, DISTANCE_MIN_FRACTION,
 } from "../../qise/gates.js";
 import { frameStats } from "../../qise/framestats.js";
 import { computeReadingMetrics, lumRatioP90P50 } from "../../qise/metrics.js";
@@ -79,6 +80,34 @@ const FACE_MODEL = new URL(
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+/**
+ * Size and position the face guide from the ACTUAL rendered capture-frame
+ * box, so it represents the same buffer fraction the `distance` gate
+ * measures whatever crop `object-fit: cover` is currently applying
+ * (src/qise/frame-geometry.js). Without this the guide was a static CSS
+ * oval with no principled relationship to DISTANCE_MIN_FRACTION — CLAUDE.md
+ * item 57's exact failure mode, present here even though beta.js already
+ * carried the fix.
+ */
+function applyFaceGuide(video) {
+  const box = $("capture-frame");
+  const guide = $("face-guide");
+  if (!box || !guide || !video.videoWidth || !video.videoHeight) return;
+  const rect = box.getBoundingClientRect();
+  if (!(rect.width > 0) || !(rect.height > 0)) return;
+  const guideRect = faceGuideRect({
+    bufferWidth: video.videoWidth,
+    bufferHeight: video.videoHeight,
+    boxWidth: rect.width,
+    boxHeight: rect.height,
+    minInterocularFraction: DISTANCE_MIN_FRACTION,
+  });
+  guide.style.left = `${(guideRect.leftFraction * 100).toFixed(3)}%`;
+  guide.style.top = `${(guideRect.topFraction * 100).toFixed(3)}%`;
+  guide.style.width = `${(guideRect.widthFraction * 100).toFixed(3)}%`;
+  guide.style.height = `${(guideRect.heightFraction * 100).toFixed(3)}%`;
+}
 
 const consent = createConsent();
 let store = null;
@@ -122,6 +151,18 @@ function show(id) {
   for (const s of document.querySelectorAll(".screen")) {
     s.dataset.active = String(s.id === id);
   }
+  // The capture screen is genuinely full-viewport (see .capture-frame in
+  // qise.html): the header and the page's own top padding are the last
+  // things standing between the video and the physical top of the screen,
+  // and CSS can't know which screen is active on its own.
+  document.body.classList.toggle("capture-live", id === "screen-capture");
+  // A step change, not an in-page scroll — leftover scroll position from
+  // the previous screen otherwise persists onto the new one. Harmless when
+  // every screen fit in one viewport; not harmless now that the capture
+  // frame is tall and sits at the very top of its screen, where a few
+  // hundred pixels of inherited scroll crops straight into the live camera
+  // preview a person is about to use.
+  window.scrollTo(0, 0);
 }
 
 function selectReadingTab(name, { scroll = true } = {}) {
@@ -260,6 +301,7 @@ async function runCapture() {
   screenLightDismissed = false;
   lightOverrideRequested = false;
   $("capture-frame").dataset.previewLift = "false";
+  $("face-guide").dataset.pose = "unavailable";
   $("illumination-state").hidden = !illuminationRequested;
   $("illumination-state").textContent = illuminationRequested
     ? "Colour response check selected"
@@ -284,6 +326,7 @@ async function runCapture() {
   let landmarker = null;
   try {
     await attachCameraPreview(video, opened.stream);
+    applyFaceGuide(video);
     const focus = await ensureContinuousFocus(opened.track);
     landmarker = await buildLandmarker("VIDEO");
     opened.focusSupported = focus.supported;
@@ -483,6 +526,17 @@ async function runCapture() {
         acceptUnevenLight: lightOverrideRequested,
       });
       const illuminationStable = illuminationFrameStable(gates);
+
+      // Real-time ghost-outline feedback: the guide oval itself reflects the
+      // pose gate's live status, so a person sees correction feedback where
+      // they're already looking instead of only learning a capture failed
+      // after the fact. Reuses the pose gate's own POSE_YAW_MAX/PITCH/ROLL
+      // margins verbatim — no new threshold, no new measurement. A pose
+      // entry absent from `failures` means it passed; when present its
+      // `status` is "unavailable" (no face/axes measured yet) or "fail"
+      // (measured, outside tolerance) — see gates.js's evaluateGates.
+      const poseFailure = gates.failures.find((failure) => failure.id === "pose");
+      $("face-guide").dataset.pose = poseFailure ? poseFailure.status : "pass";
 
       const elapsedMs = nowMs - startedAt;
       const underexposed = gates.failures.some((failure) => failure.id === "underexposed");
@@ -768,6 +822,7 @@ async function runCapture() {
         screenLightSince = null;
       }
       $("capture-frame").dataset.previewLift = "false";
+      $("face-guide").dataset.pose = "unavailable";
       $("refocus-camera").hidden = true;
       $("use-current-light").hidden = true;
       exposureHalo?.setCaptureState("seeking");
