@@ -1,0 +1,25 @@
+# Governance, automation and release gates require explicit owner review.
+/AGENTS.md @nnattheuu-oss
+/CLAUDE.md @nnattheuu-oss
+/GEMINI.md @nnattheuu-oss
+/.github/CODEOWNERS @nnattheuu-oss
+/.github/claude/prompts/ @nnattheuu-oss
+/.github/workflows/ @nnattheuu-oss
+/.devcontainer/ @nnattheuu-oss
+/docs/PROJECT_CHARTER.md @nnattheuu-oss
+/docs/DECISION_REGISTER.md @nnattheuu-oss
+/docs/AGENT_OPERATING_MODEL.md @nnattheuu-oss
+/docs/INTERPRETATION_SYSTEM.md @nnattheuu-oss
+/docs/OPTION_B_PROGRAM.md @nnattheuu-oss
+/docs/OPTION_B_EXECUTION_PLAN.md @nnattheuu-oss
+/docs/agents/ @nnattheuu-oss
+/docs/proposals/ @nnattheuu-oss
+/docs/CLAUDE_CODE_BOOTSTRAP.md @nnattheuu-oss
+/docs/CLOUD_AGENT_RUNBOOK.md @nnattheuu-oss
+/scripts/check-release.js @nnattheuu-oss
+/scripts/copy-scan.js @nnattheuu-oss
+/scripts/lint-bundle.js @nnattheuu-oss
+/tests/agent-governance.test.js @nnattheuu-oss
+/tests/copy-guard.test.js @nnattheuu-oss
+/tests/copy-lint.test.js @nnattheuu-oss
+/tests/source-integrity.test.js @nnattheuu-oss

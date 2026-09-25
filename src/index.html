@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0F1216" />
+<title>Mien Shiang</title>
+<link rel="manifest" href="./manifest.webmanifest" />
+<link rel="apple-touch-icon" href="./icon-192.png" />
+<script>
+// The shared project URL is the product entry point. Keep the instrument-style
+// prototype reachable for regression work without making phone users find the
+// scanner link at the bottom of that page.
+if (!new URLSearchParams(location.search).has("classic")) {
+  // Match the current shell generation so an older worker cannot serve the
+  // previous scanner once before refreshing it in the background.
+  location.replace("./qise.html?v=25");
+}
+</script>
+<style>
+/* Atlas plate + instrument readout. The product's only real claim is that it
+   shows its working, so it's built to look like something that does. Cinnabar
+   (朱砂), the pigment of seal ink and medical annotation, is the one warm note
+   and is spent almost entirely on the overlay. */
+/* NO WEBFONT IMPORT. Google Fonts was removed deliberately: it is a
+   third-party request on every load, it hands Google an IP address for a
+   product whose whole claim is that nothing leaves the device, and it is a
+   cold-start dependency that breaks the offline-first posture. The egress
+   guard treats fonts.googleapis.com as a failure, not an exception.
+   System stacks below — the typography is slightly less distinctive and the
+   privacy position is honest. */
+
+:root{
+  /* Dark theme — deep charcoal base, cinnabar accent */
+  --ink:#E8EAEC; --ink-60:#8A9299; --ink-30:#4A5158;
+  --rule:#2A2F36; --paper:#0F1216; --paper-hi:#181D23;
+  --card:#1C2128; --card-hi:#222831;
+  --cinnabar:#E05540; --jade:#4D9980; --amber:#D4A030; --alarm:#E03030;
+  --display:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace;
+  --annot:'Noto Serif CJK SC','Songti SC','Source Han Serif SC','MS Mincho',serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%}
+body{
+  background:var(--paper); color:var(--ink); font-family:var(--display);
+  font-size:16px; line-height:1.5; -webkit-font-smoothing:antialiased;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+h1,h2,h3{margin:0;font-weight:600;letter-spacing:-.02em}
+.mono{font-family:var(--mono);font-size:.75rem}
+.muted{color:var(--ink-60)}
+.eyebrow{font-family:var(--mono);font-size:.7rem;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--ink-60);margin:0}
+
+.bar{position:sticky;top:0;z-index:30;display:flex;gap:.6rem;align-items:center;
+  padding:calc(.45rem + env(safe-area-inset-top)) 1rem .45rem;
+  background:#0A0D10;color:var(--ink);font-family:var(--mono);
+  font-size:.66rem;letter-spacing:.05em;flex-wrap:wrap;
+  border-bottom:1px solid var(--rule)}
+.bar .dot{width:6px;height:6px;background:var(--jade);flex:none;border-radius:50%}
+
+header{padding:1.75rem 1rem 1rem}
+header .wordmark{font-family:var(--annot);font-size:1.6rem;color:var(--cinnabar)}
+header h1{font-size:1.75rem;line-height:1.1;margin:.5rem 0}
+header h1 em{font-style:normal;color:var(--cinnabar)}
+header p{color:var(--ink-60);margin:.75rem 0 0;font-size:.95rem}
+
+main{padding:0 1rem 3rem}
+.has-results>header,.has-results main>.plate,.has-results>footer{display:none}
+.has-results main{padding-top:1rem}
+.result-shell{max-width:46rem;margin:0 auto}
+.result-titlebar{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin:.25rem 0 1rem}
+.result-titlebar h2{font-size:1.45rem;margin-top:.2rem}
+.result-new{width:auto;margin:0;padding:.55rem .8rem;font-size:.85rem}
+.result-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:.35rem;background:var(--card);padding:.3rem;border:1px solid var(--rule);border-radius:10px;margin:0 0 1rem}
+.result-tabs button{margin:0;padding:.6rem .4rem;border:0;background:transparent;color:var(--ink-60);font-size:.85rem;border-radius:7px}
+.result-tabs button[aria-selected="true"]{background:var(--card-hi);color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.2)}
+.result-tabs button:disabled{opacity:.35}
+.result-panel[hidden]{display:none}
+.result-panel>.summary-card{margin-top:0}
+button{font-family:var(--display);font-size:1rem;font-weight:500;
+  border:1px solid var(--cinnabar);background:var(--cinnabar);
+  color:#fff;padding:.85em 1.4em;border-radius:6px;
+  cursor:pointer;width:100%;margin-top:.6rem;transition:opacity .15s}
+button.ghost{background:transparent;color:var(--ink);border-color:var(--rule)}
+button.ghost:hover{border-color:var(--ink-60)}
+button:disabled{opacity:.35}
+:focus-visible{outline:2px solid var(--cinnabar);outline-offset:2px}
+
+.plate{border:1px solid var(--rule);background:var(--card);padding:1rem;
+  margin-top:1rem;border-radius:8px}
+.frame{position:relative;width:100%}
+.frame img{display:block;width:100%;height:auto;border-radius:4px}
+.frame svg{position:absolute;inset:0;width:100%;height:100%}
+.roi{fill:none;stroke:var(--cinnabar);stroke-width:1.25;vector-effect:non-scaling-stroke;
+  opacity:.75}
+.roi.flag{stroke:var(--alarm);stroke-width:2.5;opacity:1}
+.roi.dim{opacity:.1}
+.empty{border:1px dashed var(--rule);aspect-ratio:3/4;display:grid;place-content:center;
+  text-align:center;padding:1.5rem;color:var(--ink-60);gap:.5rem;border-radius:4px}
+
+/* ── Three-step rail ──────────────────────────────────────────────────────
+   Photo → Read → Result. Meaning survives without colour: the current step
+   carries aria-current and a filled numeral, not only a cinnabar rule. */
+.steps{display:flex;list-style:none;margin:.9rem 0 .85rem;padding:0;gap:.4rem;
+  font-family:var(--mono);font-size:.66rem;letter-spacing:.06em;text-transform:uppercase}
+.step{flex:1 1 0;display:flex;align-items:center;gap:.4rem;color:var(--ink-30);
+  border-top:2px solid var(--rule);padding-top:.45rem}
+.step-n{display:grid;place-content:center;width:1.15rem;height:1.15rem;flex:none;
+  border:1px solid currentColor;border-radius:50%;font-size:.62rem;line-height:1}
+.step.is-current{color:var(--cinnabar);border-top-color:var(--cinnabar)}
+.step.is-current .step-n{background:var(--cinnabar);border-color:var(--cinnabar);color:#fff}
+.step.is-done{color:var(--jade);border-top-color:var(--jade)}
+
+.shot-hint{margin:.7rem 0 0;font-size:.82rem;color:var(--ink-60)}
+/* The un-mirror control is load-bearing (laterality) but it is not a choice a
+   user can reason about unaided, so the reason sits next to it rather than in
+   the parenthetical it used to be compressed into. */
+.toggle-why{margin:.35rem 0 0;font-size:.76rem;color:var(--ink-30);max-width:60ch}
+
+/* ── Type scale ───────────────────────────────────────────────────────────
+   Four steps, used consistently: section label (mono eyebrow), result value
+   (h3), body, caveat. Body copy is capped at ~66ch because the dense
+   interpretation paragraphs were the main thing making results read as a
+   wall — line length does more for that than font size does. */
+.reading-block p,.reading-block li,.summary-emphasis,.lede{max-width:66ch}
+.reading-block p{line-height:1.65;margin:.75rem 0 0}
+.lede{font-size:1rem;color:var(--ink);margin:.35rem 0 .6rem;line-height:1.5}
+.reading-block .muted.small,.differ-body{line-height:1.6}
+
+/* Summary card — the reading receipt */
+.summary-card{background:var(--card-hi);border:1px solid var(--rule);
+  border-top:3px solid var(--cinnabar);border-radius:8px;padding:1.25rem;
+  margin-top:1.25rem}
+.summary-card .eyebrow{color:var(--cinnabar)}
+.summary-headline{font-size:1.3rem;font-weight:600;margin:.55rem 0 .5rem;
+  line-height:1.3;display:flex;flex-wrap:wrap;align-items:baseline;gap:.1rem .45rem}
+.summary-term{white-space:nowrap}
+.summary-term .hanzi{font-family:var(--annot);color:var(--cinnabar);margin-left:.25rem}
+.summary-sep{color:var(--ink-30)}
+.summary-nothing{font-size:.95rem;color:var(--ink-60);margin:.55rem 0 .5rem;max-width:66ch}
+/* Coverage: scope stated in the same numbers the sections use. */
+.summary-coverage{font-family:var(--mono);font-size:.7rem;letter-spacing:.04em;
+  color:var(--ink-60);margin:0 0 .9rem;line-height:1.7}
+.summary-chips{display:flex;flex-wrap:wrap;gap:.45rem;margin-bottom:.9rem}
+.summary-chip{display:flex;flex-direction:column;gap:.15rem;text-decoration:none;
+  padding:.45rem .65rem;border-radius:6px;border:1px solid var(--rule);
+  background:var(--card);min-width:8.5rem;flex:1 1 auto}
+.summary-chip-label{font-family:var(--mono);font-size:.6rem;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--ink-60)}
+.summary-chip-value{font-size:.92rem;color:var(--ink)}
+.summary-chip.is-read{border-color:var(--jade)}
+.summary-chip.is-partial{border-color:var(--amber)}
+/* Not-read is NEUTRAL, never an error colour: it is scope, not failure. */
+.summary-chip.is-unread .summary-chip-value{color:var(--ink-60);font-style:italic}
+.summary-chip:hover{background:var(--card-hi)}
+.summary-emphasis{font-size:.95rem;color:var(--ink);margin:0 0 .9rem;line-height:1.6}
+.summary-caveat{font-size:.78rem;color:var(--ink-60);margin:.9rem 0 0;
+  padding-top:.7rem;border-top:1px dotted var(--rule)}
+.summary-actions{display:flex;gap:.5rem;flex-wrap:wrap;margin:.2rem 0 0}
+.summary-actions button{width:auto;flex:1 1 10rem;margin-top:0;font-size:.9rem;
+  padding:.7em 1em}
+
+/* ── Three Courts proportion bar ──────────────────────────────────────────
+   Meaning must survive without colour, so every segment and every legend row
+   carries its own text. The bar is redundant with the legend by design. */
+.court-bar{display:flex;height:2.4rem;border-radius:5px;overflow:hidden;
+  border:1px solid var(--rule);margin:.35rem 0 .6rem}
+.court-seg{display:grid;place-content:center;min-width:0;overflow:hidden}
+.court-seg-pct{font-family:var(--mono);font-size:.66rem;color:#0F1216;
+  padding:0 .2rem}
+.court-upper{background:#78848E}
+.court-middle{background:#A8B2BB}
+.court-lower{background:var(--cinnabar)}
+.court-seg.is-dominant{outline:2px solid var(--ink);outline-offset:-2px}
+.court-legend{list-style:none;margin:0 0 .6rem;padding:0;display:flex;
+  flex-direction:column;gap:.3rem}
+.court-key{display:flex;align-items:center;gap:.5rem;font-size:.85rem;
+  color:var(--ink-60)}
+.court-swatch{width:.7rem;height:.7rem;border-radius:2px;flex:none}
+/* The name takes the slack so the percentages form a column; the dominant tag
+   trails it. Without this the tagged row's figure sits out of alignment. */
+.court-name{color:var(--ink);flex:1 1 auto}
+.court-pct{font-family:var(--mono);font-size:.78rem;color:var(--ink);
+  text-align:right;flex:none;min-width:4rem}
+.court-key .tag{margin-left:.1rem;flex:none}
+
+/* ── "Sources differ" as progressive disclosure ───────────────────────────
+   Collapsed, not deleted. The text stays in the document either way. */
+.differ-disclosure{margin-top:.9rem;background:rgba(212,160,48,.07);
+  border-left:2px solid var(--amber);border-radius:0 4px 4px 0}
+.differ-disclosure>summary{cursor:pointer;padding:.55rem .8rem;
+  font-family:var(--mono);font-size:.7rem;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--amber);display:flex;gap:.45rem;
+  align-items:center}
+.differ-disclosure>summary::marker{color:var(--amber)}
+.differ-body{margin:0;padding:0 .8rem .7rem;font-size:.82rem;
+  color:var(--ink-60);max-width:66ch}
+.differ-mark{flex:none}
+
+.palace-group{font-family:var(--mono);font-size:.68rem;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--ink-60);margin:1.1rem 0 .3rem;
+  font-weight:500}
+.palace-scope{margin-top:.9rem}
+
+.rec{border-top:1px solid var(--rule);padding:1.1rem 0}
+.rec h3{font-size:1.1rem;text-transform:capitalize;color:var(--ink)}
+.rec p{margin:.5rem 0 0;color:var(--ink-60)}
+.rec ul{margin:.7rem 0 0;padding-left:1.1rem}
+.rec li{margin:.4rem 0;color:var(--ink-60)}
+.prov{margin-top:.8rem;padding-top:.55rem;border-top:1px dotted var(--rule);
+  font-family:var(--mono);font-size:.7rem;color:var(--ink-30);overflow-wrap:anywhere}
+
+.referral{border:1px solid var(--alarm);border-left:3px solid var(--alarm);
+  padding:1.1rem;margin-bottom:1.25rem;background:rgba(224,48,48,.07);border-radius:6px}
+.referral .eyebrow{color:var(--alarm)}
+.referral h3{font-size:1.1rem;margin:.4rem 0 .5rem}
+.halted{border-left:2px solid var(--amber);padding:.5rem 0 .5rem .85rem;
+  color:var(--ink-60);font-size:.85rem;margin-bottom:1.25rem}
+.limits{border:1px solid var(--rule);border-left:2px solid var(--jade);
+  padding:.9rem 1rem;margin-bottom:1.25rem;background:var(--card);border-radius:6px}
+.limits.warn{border-left-color:var(--amber)}
+.limits p{margin:.5rem 0 0;font-size:.85rem;color:var(--ink-60)}
+.notmeasured{margin:.6rem 0 0;padding-top:.55rem;border-top:1px dotted var(--rule);
+  font-family:var(--mono);font-size:.7rem;color:var(--ink-60);overflow-wrap:anywhere}
+
+/* The reading — Module A */
+.reading-lead{margin:1.25rem 0 0;font-size:.88rem;color:var(--ink-60);
+  border-left:2px solid var(--cinnabar);padding-left:.85rem}
+.reading-block{border-top:1px solid var(--rule);padding:1.25rem 0}
+.reading-block h3{font-size:1.25rem;margin:.35rem 0 .6rem;color:var(--ink)}
+.reading-block p{margin:.6rem 0 0;color:var(--ink-60)}
+.reading-block .hanzi{font-family:var(--annot);color:var(--cinnabar);margin-left:.15rem}
+.small{font-size:.8rem}
+
+/* Insights narrative. The teaser sits on the free side of the share gate and
+   the report on the gated side, so they are styled as one family but are not
+   one block — see renderReadingGated(). */
+.insights-teaser{margin:.9rem 0 0;padding-left:.85rem;border-left:2px solid var(--rule)}
+.insights-teaser p{margin:.35rem 0 0;color:var(--ink-60);font-size:.92rem;max-width:66ch}
+.insights-report{border-top:1px solid var(--rule);padding:1.25rem 0}
+.insights-report h3{font-size:1.25rem;margin:.35rem 0 .6rem;color:var(--ink)}
+.insights-report p{margin:.6rem 0 0;color:var(--ink-60);max-width:66ch}
+.insights-report ul{margin:.6rem 0 0;padding-left:1.1rem}
+.insights-report li{margin:.3rem 0;color:var(--ink-60);max-width:66ch}
+
+.differ{display:flex;gap:.55rem;align-items:flex-start;margin-top:.9rem;
+  padding:.65rem .8rem;background:rgba(212,160,48,.07);border-left:2px solid var(--amber);
+  border-radius:0 4px 4px 0;font-size:.82rem;color:var(--ink-60)}
+.differ-mark{color:var(--amber);flex:none;font-size:.9rem;line-height:1.4}
+
+.basis-note{border-left:2px solid var(--jade);padding:.5rem 0 .5rem .8rem;
+  font-size:.86rem;color:var(--ink-60);margin:.2rem 0 .8rem;
+  background:rgba(77,153,128,.06);border-radius:0 4px 4px 0}
+
+details.palace{border-bottom:1px dotted var(--rule);padding:.55rem 0}
+details.palace summary{cursor:pointer;font-size:.92rem;color:var(--ink)}
+details.palace p{margin:.5rem 0 0;font-size:.88rem;color:var(--ink-60)}
+.tag{font-family:var(--mono);font-size:.62rem;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--ink-30);border:1px solid var(--rule);
+  padding:.05rem .3rem;margin-left:.35rem;border-radius:3px}
+
+.module-b{border:1px solid var(--jade);border-left-width:3px;padding:1rem;
+  margin-top:1.5rem;background:rgba(77,153,128,.05);border-radius:0 6px 6px 0}
+.module-b .eyebrow{color:var(--jade)}
+.module-b-disclaimer{font-size:.82rem;color:var(--ink-60);margin:.4rem 0 .9rem}
+.advisory p{margin:0 0 .5rem;color:var(--ink-60)}
+
+.science-link,.report-link{margin-top:.6rem;text-align:left}
+.science-link{margin-top:1.25rem}
+.report-form{padding:1.75rem 1.25rem calc(1.75rem + env(safe-area-inset-bottom));
+  background:var(--card)}
+.report-form h2{font-size:1.35rem;margin:.35rem 0 .7rem}
+.report-field{display:block;margin:1rem 0}
+.report-field span{display:block;font-size:.85rem;color:var(--ink-60);margin-bottom:.35rem}
+.report-field select,.report-field textarea{width:100%;font:inherit;font-size:.95rem;
+  padding:.6rem;border:1px solid var(--rule);background:var(--card-hi);
+  color:var(--ink);border-radius:4px}
+.report-field select option{background:var(--card-hi)}
+.report-field textarea{resize:vertical}
+
+.bar-about{width:auto;margin:0 0 0 auto;padding:.2rem .6rem;font-family:var(--mono);
+  font-size:.66rem;letter-spacing:.05em;background:transparent;color:var(--ink-60);
+  border:1px solid var(--rule);border-radius:4px;margin-top:0}
+.about{padding:1.75rem 1.25rem calc(1.75rem + env(safe-area-inset-bottom));
+  background:var(--card)}
+.about h2{font-size:1.5rem;margin:.35rem 0 .2rem}
+.about-version{font-family:var(--mono);font-size:.72rem;color:var(--ink-30);margin:0 0 1rem}
+.about-flavour{border:1px solid var(--rule);border-left:3px solid var(--jade);
+  background:var(--card-hi);padding:.9rem 1rem;margin-bottom:1rem;border-radius:0 6px 6px 0}
+.about-flavour p{margin:0 0 .3rem;color:var(--ink-60)}
+.about-flavour code{font-family:var(--mono);font-size:.78rem;color:var(--jade)}
+.about-links{display:flex;flex-direction:column;gap:.2rem;margin:1rem 0}
+.about-link{display:block;padding:.85em 0;border-bottom:1px solid var(--rule);
+  color:var(--ink);text-decoration:none;font-size:1rem}
+.ack{border-top:1px solid var(--rule);padding:.75rem 0}
+.ack p{margin:0 0 .2rem;color:var(--ink-60)}
+.science{padding:1.75rem 1.25rem calc(1.75rem + env(safe-area-inset-bottom));
+  background:var(--card)}
+.science h2{font-size:1.5rem;line-height:1.15;margin:.4rem 0 .8rem}
+.science-intro{color:var(--ink-60);margin:0 0 .4rem}
+.science-point{border-top:1px solid var(--rule);padding:1rem 0}
+.science-point h3{font-size:1.05rem;margin-bottom:.4rem;color:var(--ink)}
+.science-point p{margin:0;font-size:.92rem;color:var(--ink-60)}
+.science-refs{border-top:1px solid var(--rule);padding-top:.8rem;margin-top:.4rem;
+  font-family:var(--mono);font-size:.68rem;color:var(--ink-30)}
+
+/* Geometry debug view. Dense — exists to show working, not as a result. */
+.dbg-wrap{border:1px solid var(--rule);background:var(--card);
+  padding:.9rem 1rem;margin-top:1.25rem;border-radius:6px}
+.dbg-wrap>summary{font-family:var(--mono);font-size:.72rem;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--ink-60);cursor:pointer}
+.dbg-wrap>summary:hover{color:var(--ink)}
+.dbg-wrap .eyebrow{margin:1.1rem 0 .35rem}
+.dbg-wrap>*:first-of-type{margin-top:.9rem}
+table.dbg{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:.72rem}
+table.dbg th{text-align:left;font-weight:500;color:var(--ink-30);
+  border-bottom:1px solid var(--rule);padding:.25rem .4rem .25rem 0}
+table.dbg td{padding:.25rem .4rem .25rem 0;border-bottom:1px dotted var(--rule);
+  color:var(--ink-60);overflow-wrap:anywhere}
+table.dbg td.v{text-align:right;color:var(--ink);white-space:nowrap}
+
+.err{border-left:2px solid var(--alarm);padding:.6rem 0 .6rem .85rem;margin-top:1rem;
+  background:rgba(224,48,48,.06);border-radius:0 4px 4px 0}
+.scan{height:2px;background:var(--rule);overflow:hidden;position:relative;margin-top:1rem}
+.scan::after{content:"";position:absolute;inset:0;width:35%;background:var(--cinnabar);
+  animation:sweep 1.1s ease-in-out infinite}
+@keyframes sweep{0%{transform:translateX(-100%)}100%{transform:translateX(320%)}}
+@media (prefers-reduced-motion:reduce){.scan::after{animation:none}}
+
+.toggle{display:flex;align-items:center;gap:.6rem;margin-top:.9rem;font-size:.85rem;color:var(--ink-60)}
+.toggle input{width:1.1rem;height:1.1rem;accent-color:var(--cinnabar)}
+
+dialog{border:none;padding:0;max-width:34rem;width:calc(100% - 2rem);
+  background:var(--card);border-top:3px solid var(--cinnabar);border-radius:0 0 8px 8px}
+dialog::backdrop{background:rgba(5,8,12,.92)}
+.consent{padding:1.75rem 1.25rem calc(1.75rem + env(safe-area-inset-bottom))}
+.consent h2{font-size:1.4rem;line-height:1.1;margin-bottom:1rem}
+.clause{border-top:1px solid var(--rule);padding:.8rem 0;display:grid;
+  grid-template-columns:2rem 1fr;gap:.4rem;font-size:.9rem;color:var(--ink-60)}
+.clause .n{font-family:var(--mono);font-size:.7rem;color:var(--cinnabar)}
+.consent label{display:flex;gap:.65rem;align-items:flex-start;margin:1.25rem 0;font-size:.9rem}
+.consent input{margin-top:.25rem;width:1.15rem;height:1.15rem;accent-color:var(--cinnabar);flex:none}
+
+footer{border-top:1px solid var(--rule);margin:2rem 1rem 0;padding:1.5rem 0 3rem;
+  color:var(--ink-30);font-size:.78rem}
+footer a{color:var(--ink-60)}
+
+/* Share-gate frosted overlay */
+.reading-gate-wrap{position:relative;overflow:hidden;border-radius:8px;
+  margin-top:1rem;height:min(65svh,36rem)}
+.reading-gate-blur{filter:blur(4px);opacity:.35;user-select:none;
+  pointer-events:none;padding:.5rem}
+.reading-gate-overlay{position:absolute;inset:0;display:flex;
+  align-items:center;justify-content:center;padding:1rem;
+  background:rgba(15,18,22,.55);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.gate-card{background:var(--card-hi);border:1px solid var(--rule);
+  border-radius:8px;padding:1.5rem 1.25rem;max-width:22rem;width:100%;
+  text-align:center}
+.gate-title{font-size:1.05rem;font-weight:600;margin:0 0 .4rem}
+.gate-sub{font-size:.88rem;color:var(--ink-60);margin:0 0 .75rem;line-height:1.45}
+.gate-progress{font-size:.82rem;font-family:var(--mono);color:var(--cinnabar);
+  margin:0 0 .9rem;letter-spacing:.03em}
+.gate-btn{display:block;width:100%;padding:.65rem 1rem;border-radius:6px;
+  font:inherit;font-size:.92rem;font-weight:600;cursor:pointer;
+  border:1px solid var(--rule);background:var(--card);color:var(--ink);
+  margin-bottom:.55rem;text-decoration:none;text-align:center}
+.gate-btn-share{background:var(--cinnabar);border-color:var(--cinnabar);
+  color:#fff}
+.gate-btn:disabled{opacity:.55;cursor:default}
+.gate-or{font-size:.8rem;color:var(--ink-60);margin:.2rem 0 .55rem}
+.gate-caveat{font-size:.75rem;color:var(--ink-30);margin:.8rem 0 0;line-height:1.5}
+/* Three unlock options. Stacked on a phone, in a row once there is width for
+   it. The free option is FIRST in source order, so it is first for a screen
+   reader and first on the narrow layout where most of these are read. */
+.gate-opts{display:flex;flex-direction:column;gap:.6rem;margin:.5rem 0 0}
+.gate-opt{border:1px solid var(--rule);border-radius:7px;padding:.6rem;
+  background:var(--card);position:relative;display:flex;flex-direction:column;
+  justify-content:flex-end}
+.gate-opt-popular{border-color:#c9a227}
+.gate-flag{font-size:.68rem;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;color:#c9a227;margin:0 0 .4rem}
+.gate-opt .gate-btn{margin-bottom:.35rem}
+.gate-note{font-size:.74rem;color:var(--ink-60);margin:0}
+.gate-opt .gate-progress{font-size:.74rem;margin:0;display:inline}
+@media (min-width:560px){
+  .gate-card{max-width:34rem}
+  .gate-opts{flex-direction:row;align-items:stretch}
+  .gate-opts>*{flex:1 1 0}
+}
+</style>
+</head>
+<body>
+
+<div class="bar" role="status" data-copy="disclaimer">
+  <span class="dot" aria-hidden="true"></span>
+  <strong>FACE READING</strong><span>/</span><span>ENTERTAINMENT, NOT A DIAGNOSTIC DEVICE</span>
+  <button id="about-open" class="bar-about" type="button">About</button>
+</div>
+
+<header>
+  <div class="wordmark">Mien Shiang</div>
+  <h1>Every line it draws, it can <em>account for</em>.</h1>
+  <p>Take a photo. It measures the classical diagnostic zones against each other
+     and shows you which measurement produced each conclusion. Runs entirely on
+     your phone — no photo ever leaves it.</p>
+</header>
+
+<main>
+  <div class="plate">
+    <p class="eyebrow">Plate 01 — zone extraction</p>
+
+    <!-- Where the user is, in three steps. The flow was previously unsignposted:
+         after choosing a photo nothing said another tap was required, and the
+         results rendered below the fold so the app looked inert. `ui.js` moves
+         `is-current` and sets `aria-current`; nothing here is decorative. -->
+    <ol class="steps" id="steps">
+      <li class="step is-current" aria-current="step"><span class="step-n">1</span>Photo</li>
+      <li class="step"><span class="step-n">2</span>Read</li>
+      <li class="step"><span class="step-n">3</span>Result</li>
+    </ol>
+
+    <div id="plate"><div class="empty">
+      <p class="eyebrow">Awaiting exposure</p>
+    </div></div>
+
+    <!-- Framing guidance lives OUTSIDE the empty state on purpose. It used to
+         sit inside it, so it vanished the moment a photo was chosen — which is
+         precisely when the user can still act on it and retake. -->
+    <p class="shot-hint">Front-facing photo, even indirect light, no glasses.</p>
+
+    <input id="file" type="file" accept="image/*" capture="user" hidden />
+    <!-- `go` is FIRST in source order even though it starts hidden. Once a photo
+         exists it becomes the primary action, and a primary action rendered
+         underneath the secondary one reads as the lesser of the two. -->
+    <button id="go" hidden>Read this photo</button>
+    <button id="pick">Take or choose a photo</button>
+    <label class="toggle">
+      <input type="checkbox" id="mirror" checked />
+      <span>Taken with the front (selfie) camera</span>
+    </label>
+    <p class="toggle-why">Front cameras flip the preview left to right. This puts
+      it back the right way round before measuring, so the left and right sides
+      of the face are not swapped.</p>
+  </div>
+
+  <div id="out"></div>
+</main>
+
+<!-- The summary card's one always-visible caveat.
+     It lives HERE, not in readingview.js, for a concrete reason: the copy lint
+     buckets every prose string in a .js file as Module A copy, and "diagnosis"
+     is on the Module A blocklist. Marking it data-copy="disclaimer" is the
+     narrow, sanctioned exemption (CLAUDE.md item 21) — the disease-name and
+     assertive-phrasing guards still apply to it. ui.js reads this template and
+     passes it to renderSummary(), so there is exactly one copy of the wording
+     and the share card draws the same sentence. -->
+<!-- Share-card footer. It says "clinical", which is on the Module A blocklist,
+     and scripts/lint-bundle.js buckets EVERY prose string in a .js file as
+     Module A copy with no disclaimer bucket for JS. So this sentence can only
+     exist inside a marked block here; sharecard.js receives it as an argument.
+     Moving it into the module fails `npm run lint:bundle`, which is the alarm
+     working, not an obstacle. Same arrangement as the summary caveat below. -->
+<template id="tpl-sharecard-caveat"><span data-copy="disclaimer">Entertainment only. Not a clinical reading.</span></template>
+
+<template id="tpl-summary-caveat"><p class="summary-caveat" data-copy="disclaimer">Entertainment, not diagnosis. Everything here describes a tradition, not you.</p></template>
+
+<!-- Read by utils/insights.js, for the same reason as the two above: the
+     wording contains "clinical" and "diagnosis", and lint-bundle.js buckets
+     every prose string in a .js file as Module A copy with no disclaimer
+     bucket for JS. As a literal in that module it fails the blocklist twice. -->
+<template id="tpl-insights-caveat"><span data-copy="disclaimer">Entertainment only. These patterns are drawn from Traditional Chinese Medicine tradition. Not a clinical diagnosis.</span></template>
+
+<!-- data-copy="disclaimer" marks text that is ALLOWED to use health vocabulary,
+     because its whole job is to say what this app is not and does not do. The
+     copy lint exempts these blocks from the Module A blocklist and nothing
+     else — a reading can never be marked this way. The assertive-phrasing and
+     disease-name guards still apply here. -->
+<footer data-copy="disclaimer">
+  <strong>Entertainment, not diagnosis.</strong> This app shows what a traditional
+  practice says about facial proportions and complexion. It is not a medical device
+  and is not intended to diagnose, treat, mitigate, cure or prevent any disease,
+  and it is not a substitute for professional medical advice. The organ-to-region
+  correspondences it uses are traditional and are not established by controlled
+  evidence. If a health concern is worrying you, please see a doctor.
+  <a href="./privacy.html">Privacy</a> · <a href="./terms.html">Terms</a> ·
+  <!-- The Qi Se tracker is a second entry point with its own consent gate. It
+       is linked from here because a feature nothing links to is a feature
+       nobody can reach, however well it is tested. The link goes to its
+       consent screen, never past it. -->
+  <a href="./qise.html">Qi Se tracker</a>
+</footer>
+
+<dialog id="science"></dialog>
+<dialog id="report"></dialog>
+<dialog id="about"></dialog>
+<dialog id="dev-panel"></dialog>
+
+<dialog id="consent">
+  <div class="consent" data-copy="disclaimer">
+    <p class="eyebrow">Before you begin</p>
+    <h2>Read this. It changes what the results mean.</h2>
+    <div class="clause"><span class="n">01</span><div>Your photo is analysed on this device and discarded straight afterwards. It is never uploaded, never stored, and never linked to you. The camera frame and the facial measurements taken from it are held in memory for the length of one reading and then thrown away.</div></div>
+    <div class="clause"><span class="n">02</span><div>This is entertainment. Mian Xiang is a traditional practice, and its core claim — that facial features reveal character — has no scientific basis. Read the output as tradition, not as fact about you.</div></div>
+    <div class="clause"><span class="n">03</span><div>It is not a medical device and is not intended to diagnose, treat, cure or prevent any disease. Nothing here substitutes for a clinician. If a symptom worries you, see a doctor, and don't let anything this app says delay that.</div></div>
+    <div class="clause"><span class="n">04</span><div>It does not rate you. There is no attractiveness score, no ranking, and no comparison with anyone else — by design, and enforced by tests.</div></div>
+    <div class="clause"><span class="n">05</span><div>Results move with the photo. Lighting, camera and skin tone all change what can be measured, and some measurements are refused outright on deeper skin tones because the physics does not support them. You can read exactly what the research says, and what this photo could and couldn't measure, from the link on your results. <a href="./privacy.html">Privacy policy</a>.</div></div>
+    <label>
+      <input type="checkbox" id="agree" />
+      <span>I've read all five points and understand this is a traditional face reading for entertainment, not a diagnosis.</span>
+    </label>
+    <button id="accept" disabled>Continue</button>
+  </div>
+</dialog>
+
+<script type="module" src="./ui.js"></script>
+</body>
+</html>

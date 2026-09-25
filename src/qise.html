@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="referrer" content="no-referrer" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; media-src 'self' blob:; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
+<meta name="theme-color" id="theme-color" content="#DCDBD3" />
+<title>Qi Se tracker</title>
+<link rel="manifest" href="./manifest.webmanifest" />
+<link rel="apple-touch-icon" href="./icon-192.png" />
+<link rel="icon" href="./icon-192.png" />
+
+<!-- The palette is INJECTED from src/ui/qise/palette.js rather than written
+     here. One source for the five hex values and their Su Wen similes; a hex
+     corrected in one place and not the other is invisible until somebody
+     screenshots both. Same arrangement as the summary caveat in the main app. -->
+<style id="qise-palette"></style>
+
+<!-- NO WEBFONT. The brief names four families, and none of them is committed:
+     an @font-face pointing at a file that does not exist fires a 404 on every
+     load and precaches a missing entry. The families are recorded in
+     palette.js and the outstanding subsetting is recorded in
+     docs/QISE_NOTES.md. Google Fonts is not an option either — it is a
+     third-party request on every load for a product whose claim is that
+     nothing leaves the device, and the egress guard treats it as a failure. -->
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%}
+:root{
+  color-scheme:light;
+  --qise-ink:var(--hei);--qise-action-fg:var(--bai);
+  --qise-surface:rgba(237,232,220,.55);--qise-border:rgba(27,25,23,.18);
+  --qise-track:rgba(27,25,23,.10);--qise-band:rgba(27,25,23,.22);
+  --qise-selected:var(--bai);--qise-shadow:rgba(27,25,23,.12);
+  --qise-link:#294F48;--qise-danger:var(--chi);
+}
+@media (prefers-color-scheme:dark){
+  html:not([data-theme]){
+    color-scheme:dark;--ground:#151311;--qise-ink:#F1EDE4;--qise-action-fg:#151311;
+    --qise-surface:#24211E;--qise-border:rgba(237,232,220,.20);
+    --qise-track:rgba(237,232,220,.12);--qise-band:rgba(237,232,220,.28);
+    --qise-selected:#34302B;--qise-shadow:rgba(0,0,0,.32);
+    --qise-link:#8BB5AD;--qise-danger:#E17A6C;
+  }
+}
+html[data-theme="dark"]{
+  color-scheme:dark;--ground:#151311;--qise-ink:#F1EDE4;--qise-action-fg:#151311;
+  --qise-surface:#24211E;--qise-border:rgba(237,232,220,.20);
+  --qise-track:rgba(237,232,220,.12);--qise-band:rgba(237,232,220,.28);
+  --qise-selected:#34302B;--qise-shadow:rgba(0,0,0,.32);
+  --qise-link:#8BB5AD;--qise-danger:#E17A6C;
+}
+html[data-theme="light"]{color-scheme:light}
+html[data-screen-flash="true"]{
+  color-scheme:light;--ground:#FFFDF5;--qise-ink:#171411;--qise-action-fg:#FFFDF5;
+  --qise-surface:#F4EFE4;--qise-border:rgba(27,25,23,.2);--qise-track:rgba(27,25,23,.12);
+  --qise-band:rgba(27,25,23,.24);--qise-selected:#FFF;--qise-shadow:rgba(27,25,23,.15);
+}
+body{
+  background:
+    radial-gradient(circle at 15% 4%, color-mix(in srgb,var(--chi) 12%,transparent) 0,transparent 28rem),
+    radial-gradient(circle at 95% 32%, color-mix(in srgb,var(--qing) 10%,transparent) 0,transparent 25rem),
+    var(--ground); color:var(--qise-ink);
+  font-family:var(--display); font-size:17px; line-height:1.58;
+  -webkit-font-smoothing:antialiased;
+  padding:0 0 env(safe-area-inset-bottom);
+  transition:background-color .18s ease,color .18s ease;
+}
+.wrap{max-width:42rem;margin:0 auto;padding:1.1rem 1rem 5rem}
+h1,h2,h3{margin:0 0 .4rem;font-weight:600;letter-spacing:-.01em}
+h1{font-size:clamp(1.55rem,5vw,2.25rem);line-height:1.12}
+h2{font-size:1.05rem}
+p{margin:0 0 .7rem}
+a{color:var(--qise-link)}
+.cjk{font-family:var(--cjk)}
+.num{font-family:var(--numeric);font-variant-numeric:tabular-nums}
+.passage{font-family:var(--passage);font-size:1.06rem;line-height:1.62}
+.muted{opacity:.68;font-size:.86rem}
+
+/* Focus must be VISIBLE. A focus ring removed for tidiness makes the whole
+   flow unusable by keyboard, and this flow has no shutter button to fall back
+   on. */
+:focus-visible{outline:3px solid var(--chi);outline-offset:2px;border-radius:2px}
+
+button{
+  font:inherit;color:inherit;background:transparent;
+  border:1px solid var(--qise-border);border-radius:999px;
+  padding:.6rem 1rem;cursor:pointer;min-height:44px;
+}
+button[disabled]{opacity:.45;cursor:not-allowed}
+.primary{background:var(--chi);border-color:var(--chi);color:#fff;box-shadow:0 12px 32px color-mix(in srgb,var(--chi) 24%,transparent)}
+.danger{border-color:var(--qise-danger);color:var(--qise-danger)}
+.app-head{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1.7rem;flex-wrap:wrap}
+.wordmark{font-size:.78rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
+.head-actions{display:flex;align-items:center;gap:.65rem}
+.privacy-mark{display:flex;align-items:center;gap:.35rem;font-size:.76rem;opacity:.66}
+.privacy-mark::before{content:"";width:.52rem;height:.52rem;border-radius:50%;background:var(--qing)}
+.theme-toggle{min-height:36px;padding:.35rem .65rem;border-color:var(--qise-border);border-radius:999px;font-size:.76rem}
+.surface{background:color-mix(in srgb,var(--qise-surface) 88%,transparent);border:1px solid var(--qise-border);border-radius:24px;padding:1.15rem;margin:1rem 0;box-shadow:0 16px 50px color-mix(in srgb,var(--qise-shadow) 55%,transparent)}
+.eyebrow{color:var(--chi);font-size:.73rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-bottom:.5rem}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-top:1.25rem}
+.actions .primary,.actions .wide{grid-column:1/-1}
+.actions button{border-radius:10px}
+.section-label{display:flex;justify-content:space-between;gap:1rem;align-items:baseline;margin-top:1.2rem}
+.section-label h2{margin:0}
+.consent-progress{font-family:var(--numeric);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;opacity:.68;margin-bottom:.7rem}
+.consent-step[hidden]{display:none}
+.consent-actions{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-top:1rem}
+.consent-actions .primary,.consent-actions .wide{grid-column:1/-1}
+.consent-actions button{border-radius:10px}
+.welcome-hero{padding:.35rem 0 .5rem}
+.welcome-mark{width:4.5rem;height:4.5rem;display:grid;place-items:center;border:1px solid var(--qise-border);border-radius:48% 52% 44% 56%;font-family:var(--cjk);font-size:2rem;margin:0 0 1.35rem;transform:rotate(-2deg);background:var(--qise-surface)}
+.welcome-hero h1{font-family:var(--passage);font-size:clamp(2.15rem,9vw,3.3rem);font-weight:500;line-height:1.02;letter-spacing:-.035em;margin-bottom:1rem}
+.welcome-lede{font-size:1.02rem;line-height:1.65;max-width:32rem}
+.promise-list{list-style:none;margin:1.35rem 0 1.45rem;padding:0;border-top:1px solid var(--qise-border)}
+.promise-list li{display:flex;gap:.75rem;align-items:flex-start;padding:.78rem 0;border-bottom:1px solid var(--qise-border);font-size:.9rem}
+.promise-list li::before{content:"";width:.55rem;height:.55rem;border-radius:50%;background:var(--qing);margin-top:.43rem;flex:none}
+.privacy-copy p{font-size:.94rem}
+
+.screen{display:none}
+.screen[data-active="true"]{display:block}
+
+/* ── the seal ─────────────────────────────────────────────────────────── */
+.qise-seal{width:100%;height:auto;color:var(--qise-ink);display:block}
+.seal-frame{width:min(52vw,13rem);margin:0 auto .8rem;filter:drop-shadow(0 18px 24px color-mix(in srgb,var(--qise-shadow) 70%,transparent))}
+
+/* Motion is ornamental and every creative enhancement stops on request. */
+@keyframes qise-settle{from{opacity:.45;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
+.qise-seal [data-dot]{animation:qise-settle .5s ease-out both;transform-origin:center}
+.ring-fill{transition:stroke-dashoffset .25s linear}
+@media (prefers-reduced-motion: reduce){
+  .qise-seal [data-dot]{animation:none}
+  .ring-fill{transition:none}
+  .illumination-wash{transition:none}
+  .reading-hero::before,.reading-aura::before,.reading-aura::after,.palace-stars span,.palace-card,.palace-burst i,.exposure-halo[data-state="perfect"] .halo-track,.exposure-halo[data-state="perfect"] .halo-progress{animation:none}
+  *{scroll-behavior:auto}
+}
+.qise-seal[data-reduced-motion="true"] [data-dot]{animation:none}
+
+/* ── gauges ───────────────────────────────────────────────────────────── */
+.gauge{margin:.8rem 0}
+.gauge-label{display:flex;justify-content:space-between;gap:1rem;align-items:baseline;margin-bottom:.35rem}
+.gauge-track{position:relative;height:10px;background:var(--qise-track);border-radius:5px}
+.gauge-band{position:absolute;top:0;bottom:0;background:var(--qise-band);border-radius:5px}
+.gauge-mark{position:absolute;top:-4px;width:3px;height:18px;background:var(--chi)}
+
+/* ── courts, chips, sparkline ─────────────────────────────────────────── */
+.courts{display:flex;gap:.4rem;margin:.8rem 0}
+.court{flex:1;border:1px solid var(--qise-border);padding:.45rem .5rem;border-radius:2px}
+.chips{display:flex;flex-wrap:wrap;gap:.4rem;margin:.6rem 0}
+.chip{border:1px solid var(--qise-border);border-radius:999px;padding:.3rem .7rem;font-size:.86rem}
+.spark{width:100%;height:44px;display:block}
+.history{display:grid;grid-template-columns:1fr;gap:.8rem;margin:1rem 0 1.4rem}
+.history figure{margin:0;background:var(--qise-surface);border:1px solid var(--qise-border);border-radius:20px;box-shadow:0 12px 30px color-mix(in srgb,var(--qise-shadow) 48%,transparent);overflow:hidden}
+.history-card{width:100%;display:grid;grid-template-columns:5.4rem 1fr;gap:1rem;align-items:center;padding:.9rem;border:0;border-radius:0;text-align:left;color:inherit}
+.history figure .qise-seal{width:5.4rem}
+.history-date{display:block;font-size:.76rem;opacity:.72;font-family:var(--numeric)}
+.history-copy h2{font-family:var(--passage);font-size:1.18rem;line-height:1.2;margin:.12rem 0 .42rem}
+.history-mini-bar{display:flex;height:.42rem;overflow:hidden;border-radius:999px;background:var(--qise-track);margin:.55rem 0}
+.history-mini-bar span{min-width:2px}
+
+.notice{border-left:3px solid var(--huang);padding:.5rem .7rem;margin:.8rem 0;font-size:.9rem}
+.segmented{display:grid;grid-template-columns:repeat(3,1fr);gap:.35rem;background:var(--qise-track);padding:.3rem;border-radius:12px;margin:1rem 0}
+.segmented button{border:0;border-radius:9px;padding:.45rem .35rem;font-size:.82rem}
+.segmented button[aria-pressed="true"]{background:var(--qise-selected);box-shadow:0 1px 5px var(--qise-shadow)}
+.share-status{min-height:1.5em;margin-top:.8rem}
+.reading-intro{text-align:center}
+.reading-intro h1{margin-bottom:.25rem}
+.reading-tabs{position:sticky;top:.5rem;z-index:4;display:grid;grid-template-columns:repeat(3,1fr);gap:.3rem;background:color-mix(in srgb,var(--qise-surface) 82%,transparent);backdrop-filter:blur(18px);padding:.3rem;border:1px solid var(--qise-border);border-radius:999px;margin:0 0 1.15rem;box-shadow:0 10px 30px var(--qise-shadow)}
+.reading-tabs button{border:0;border-radius:999px;padding:.55rem .35rem;font-size:.82rem;min-height:40px;color:inherit}
+.reading-tabs button[aria-selected="true"]{background:var(--qise-selected);box-shadow:0 1px 5px var(--qise-shadow)}
+.reading-panel[hidden]{display:none}
+.reading-hero{position:relative;text-align:center;padding:1.2rem 1rem 1.4rem;margin-bottom:1rem;border:1px solid color-mix(in srgb,var(--chi) 32%,var(--qise-border));border-radius:30px;background:linear-gradient(155deg,color-mix(in srgb,var(--chi) 11%,var(--qise-surface)),color-mix(in srgb,var(--ground) 88%,transparent) 52%,color-mix(in srgb,var(--qing) 12%,var(--qise-surface)));overflow:hidden;box-shadow:0 24px 70px color-mix(in srgb,var(--qise-shadow) 80%,transparent)}
+.reading-hero::before{content:"";position:absolute;width:18rem;height:18rem;left:50%;top:1rem;transform:translateX(-50%);border-radius:50%;background:conic-gradient(from 30deg,color-mix(in srgb,var(--chi) 25%,transparent),color-mix(in srgb,var(--huang) 18%,transparent),color-mix(in srgb,var(--qing) 18%,transparent),transparent 65%,color-mix(in srgb,var(--chi) 25%,transparent));filter:blur(18px);pointer-events:none;animation:ritual-turn 18s linear infinite}
+.reading-hero>*{position:relative}
+.reading-aura{position:relative;width:min(58vw,15rem);margin:0 auto .6rem}
+.reading-aura::before,.reading-aura::after{content:"";position:absolute;border:1px solid color-mix(in srgb,var(--chi) 38%,transparent);border-radius:50%;inset:7%;animation:ritual-breathe 3.6s ease-in-out infinite;pointer-events:none}
+.reading-aura::after{inset:-1%;border-color:color-mix(in srgb,var(--huang) 28%,transparent);animation-delay:-1.8s}
+.reading-aura .seal-frame{width:100%;margin:0}
+.today-next{display:grid;grid-template-columns:1fr auto;gap:.8rem;align-items:center;text-align:left;margin:1.1rem 0 0;padding:.85rem;border:1px solid color-mix(in srgb,var(--huang) 45%,var(--qise-border));border-radius:18px;background:color-mix(in srgb,var(--ground) 72%,transparent);backdrop-filter:blur(12px)}
+.today-next p{margin:0;font-size:.82rem;line-height:1.45}
+.today-next button{border:0;background:var(--qise-ink);color:var(--qise-action-fg);font-size:.78rem;white-space:nowrap}
+.today-ritual{position:relative;padding:1.15rem;margin:1rem 0;border:1px solid var(--qise-border);border-radius:24px;background:linear-gradient(120deg,color-mix(in srgb,var(--huang) 12%,var(--qise-surface)),var(--qise-surface));overflow:hidden}
+.today-ritual::after{content:"TODAY";position:absolute;right:-.25rem;bottom:-.4rem;font-family:var(--numeric);font-size:2.4rem;line-height:1;letter-spacing:.16em;opacity:.045;pointer-events:none}
+.today-ritual h2{font-family:var(--passage);font-size:1.45rem}
+.today-ritual p{max-width:30rem}
+.today-shortcuts{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-top:.9rem}
+.today-shortcuts button{border-radius:14px;text-align:left;display:flex;justify-content:space-between;align-items:center;gap:.5rem}
+.today-shortcuts button::after{content:"→";color:var(--chi)}
+.palace-orbit{display:flex;align-items:center;gap:.65rem;margin:.9rem 0 0;padding-top:.8rem;border-top:1px solid var(--qise-border)}
+.palace-stars{display:grid;grid-template-columns:repeat(6,.42rem);gap:.32rem}
+.palace-stars span{width:.42rem;height:.42rem;border-radius:50%;background:var(--chi);box-shadow:0 0 10px color-mix(in srgb,var(--chi) 75%,transparent);animation:star-wake 2.4s ease-in-out infinite;animation-delay:calc(var(--star) * -120ms)}
+.palace-orbit strong{font-size:.78rem;letter-spacing:.04em}
+@keyframes ritual-turn{to{transform:translateX(-50%) rotate(360deg)}}
+@keyframes ritual-breathe{50%{transform:scale(1.045);opacity:.45}}
+@keyframes star-wake{50%{transform:scale(.6);opacity:.4}}
+.reading-stage{display:inline-flex;border:1px solid var(--qise-border);border-radius:999px;padding:.25rem .65rem;margin:0 0 .75rem;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;opacity:.76}
+.reading-hook{font-family:var(--passage);font-size:clamp(2rem,7.8vw,3.15rem);font-weight:500;line-height:1.03;letter-spacing:-.035em;margin:.45rem auto .85rem;max-width:30rem}
+.reading-verdict{font-size:.94rem;font-weight:500;line-height:1.5;max-width:30rem;margin:0 auto}
+.reflection{position:relative;border:0;padding:1.15rem 1.15rem 1.15rem 2.1rem;margin:1rem 0;background:color-mix(in srgb,var(--chi) 8%,var(--qise-surface));border-radius:20px;font-family:var(--passage);font-size:1.12rem;line-height:1.55}
+.reflection::before{content:"“";position:absolute;left:.72rem;top:.35rem;color:var(--chi);font-size:2.4rem;line-height:1}
+.story-passage{font-family:var(--passage);font-size:1.04rem;line-height:1.72;margin:0}
+/* "Your record" — the reader's own measured material, kept visually apart from
+   the attributed passage below it so the two layers cannot read as one voice. */
+.personal-record{display:block;margin:0 0 1.25rem;padding-bottom:1.1rem;border-bottom:1px solid var(--qise-border)}
+.personal-record p{margin:0 0 .5rem}
+.personal-record p:last-child{margin-bottom:0}
+.integrated-card{margin:1rem 0;padding:1.15rem;border:1px solid color-mix(in srgb,var(--chi) 38%,var(--qise-border));border-radius:22px;background:linear-gradient(145deg,color-mix(in srgb,var(--chi) 10%,var(--qise-surface)),var(--qise-surface) 60%)}
+.integrated-card h2{font-family:var(--passage);font-size:1.55rem;line-height:1.12;margin:.2rem 0 .55rem}
+.integrated-mark{display:grid;grid-template-columns:auto 1fr;gap:.9rem;align-items:center;margin-top:.9rem}
+.integrated-glyph{display:grid;place-items:center;width:3.5rem;height:3.5rem;border:1px solid var(--qise-border);border-radius:50%;font-family:var(--passage);font-size:1.7rem;color:var(--chi)}
+.integrated-frame{font-family:var(--numeric);font-size:.74rem;opacity:.7}
+.structural-story{display:grid;gap:1rem;margin-top:1rem}
+.structure-section{padding:1.05rem;border:1px solid var(--qise-border);border-radius:20px;background:var(--qise-surface)}
+.structure-section h2{font-family:var(--passage);font-size:1.35rem;margin:.18rem 0 .55rem}
+.structure-reading{font-family:var(--passage);font-size:1rem;line-height:1.62}
+.court-bars{display:grid;gap:.45rem;margin:.85rem 0}
+.court-bar{display:grid;grid-template-columns:4.8rem 1fr 2.5rem;gap:.55rem;align-items:center;font-size:.75rem}
+.court-track{height:.55rem;border-radius:999px;background:var(--qise-track);overflow:hidden}
+.court-fill{display:block;height:100%;background:var(--huang);border-radius:inherit}
+.palace-collection{position:relative;overflow:hidden;scroll-margin-top:5rem;background:linear-gradient(145deg,color-mix(in srgb,var(--chi) 7%,var(--qise-surface)),var(--qise-surface) 42%,color-mix(in srgb,var(--qing) 8%,var(--qise-surface)))}
+.palace-heading{display:grid;grid-template-columns:1fr auto;gap:1rem;align-items:center}
+.palace-count{display:flex;align-items:baseline;gap:.15rem;color:var(--chi)}
+.palace-count strong{font-family:var(--numeric);font-size:2.4rem;line-height:1}
+.palace-count span{font-size:.75rem}
+.palace-grid{display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-top:1rem}
+.palace-card{position:relative;border:1px solid color-mix(in srgb,var(--palace-accent) 32%,var(--qise-border));border-radius:18px;background:linear-gradient(135deg,color-mix(in srgb,var(--palace-accent) 8%,var(--qise-surface)),var(--qise-surface));overflow:hidden;animation:palace-arrive .5s cubic-bezier(.2,.75,.2,1) both;animation-delay:calc(var(--palace-index) * 55ms)}
+.palace-card::before{content:"";position:absolute;width:5rem;height:5rem;right:-2rem;top:-2.5rem;border-radius:50%;background:var(--palace-accent);filter:blur(24px);opacity:.12;pointer-events:none}
+.palace-enter{position:relative;width:100%;display:grid;grid-template-columns:auto 1fr auto;gap:.65rem;align-items:center;text-align:left;border:0;border-radius:0;padding:.8rem;color:inherit}
+.palace-number{font-size:.64rem;color:var(--palace-accent);letter-spacing:.08em}
+.palace-title strong{display:block;font-family:var(--passage);font-size:1rem;line-height:1.2}
+.palace-title .muted{display:block;font-size:.7rem;margin-top:.15rem}
+.palace-arrow{color:var(--palace-accent);transition:transform .25s ease}
+.palace-card[data-open="true"] .palace-arrow{transform:rotate(90deg)}
+.palace-reveal{padding:0 .8rem .8rem;animation:palace-reveal .3s ease-out both}
+.palace-reveal p{font-size:.8rem;line-height:1.55;margin:.5rem 0 0}
+.palace-tone{display:inline-block;margin:.3rem 0;padding:.16rem .45rem;border-radius:999px;background:var(--qise-track);font-size:.68rem;text-transform:uppercase;letter-spacing:.06em}
+.palace-tone[data-contextual="true"]{border:1px solid var(--qise-border);background:transparent}
+.palace-delight{width:100%;margin-top:.8rem;border-color:color-mix(in srgb,var(--chi) 48%,var(--qise-border));border-radius:14px;background:color-mix(in srgb,var(--chi) 9%,transparent)}
+.palace-burst{position:absolute;left:50%;top:2rem;z-index:4;pointer-events:none}
+.palace-burst i{position:absolute;color:var(--palace-accent);font-style:normal;animation:palace-particle .7s ease-out both}
+.palace-burst i:nth-child(1){--burst-x:-4rem;--burst-y:-1rem}.palace-burst i:nth-child(2){--burst-x:-2rem;--burst-y:-2.8rem}.palace-burst i:nth-child(3){--burst-x:0;--burst-y:-3.5rem}.palace-burst i:nth-child(4){--burst-x:2rem;--burst-y:-2.7rem}.palace-burst i:nth-child(5){--burst-x:4rem;--burst-y:-.8rem}.palace-burst i:nth-child(6){--burst-x:1rem;--burst-y:1.8rem}
+@keyframes palace-arrive{from{opacity:0;transform:translateY(12px) scale(.98)}}
+@keyframes palace-reveal{from{opacity:0;transform:translateY(-5px)}}
+@keyframes palace-particle{from{opacity:1;transform:translate(0,0) scale(.65)}to{opacity:0;transform:translate(var(--burst-x),var(--burst-y)) scale(1.35)}}
+.source-note{font-size:.72rem;line-height:1.5;opacity:.66;margin-top:.7rem}
+.harmony-parts{display:flex;flex-wrap:wrap;gap:.45rem;margin-top:.7rem}
+.harmony-part{padding:.3rem .55rem;border:1px solid var(--qise-border);border-radius:999px;font-size:.72rem}
+.reading-privacy{text-align:center;margin-top:.9rem}
+.composition-card{padding:1.15rem;margin:1rem 0;border:1px solid var(--qise-border);border-radius:24px;background:var(--qise-surface)}
+.composition-head{display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;margin-bottom:.9rem}
+.composition-head .eyebrow{margin-bottom:.12rem}
+.composition-head h2{font-family:var(--passage);font-size:1.35rem}
+.composition-basis{font-size:.7rem;opacity:.68;border:1px solid var(--qise-border);border-radius:999px;padding:.25rem .55rem;white-space:nowrap}
+.composition-bar{display:flex;height:1.05rem;overflow:hidden;border-radius:999px;background:var(--qise-track);box-shadow:inset 0 1px 2px var(--qise-shadow)}
+.composition-segment{min-width:2px}
+.composition-lead{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-top:.85rem}
+.composition-note{padding:.7rem;border:1px solid var(--qise-border);border-radius:14px}
+.composition-note strong{display:block;font-family:var(--passage);font-size:1.05rem}
+.composition-note span{font-size:.72rem;opacity:.67}
+.pattern-progress{margin:1rem 0;padding:1.2rem;border-radius:24px;background:linear-gradient(135deg,color-mix(in srgb,var(--chi) 13%,var(--qise-surface)),var(--qise-surface));border:1px solid color-mix(in srgb,var(--chi) 35%,var(--qise-border))}
+.pattern-progress h2{font-family:var(--passage);font-size:1.35rem;margin-bottom:.4rem}
+.pattern-dots{display:grid;grid-template-columns:repeat(4,1fr);gap:.45rem;margin:.9rem 0 .55rem}
+.pattern-dot{height:.48rem;border-radius:999px;background:var(--qise-track)}
+.pattern-dot[data-filled="true"]{background:var(--chi)}
+.pattern-count{font-size:.78rem;opacity:.72}
+.pattern-intro{margin-bottom:1rem}
+.reading-actions{margin-top:1rem}
+.capture-frame{--halo-screen-strength:.18;--manual-preview-brightness:1;position:relative;overflow:hidden;border:1px solid var(--qise-border);border-radius:26px;background:#0B0A09;box-shadow:0 22px 60px rgba(0,0,0,.24)}
+.capture-frame video,.capture-frame canvas{display:block;width:100%;height:min(56svh,34rem);object-fit:cover}
+.capture-frame video{filter:brightness(var(--manual-preview-brightness));transition:filter .12s linear}
+.capture-frame[data-preview-lift="true"] video{filter:brightness(2.15) contrast(.88) saturate(.9)}
+.capture-frame [hidden]{display:none}
+.face-guide{position:absolute;z-index:3;left:50%;top:50%;width:min(66%,18rem);height:76%;transform:translate(-50%,-50%);border:1px solid rgba(255,255,255,.2);border-radius:48% 48% 44% 44%;box-shadow:0 0 0 999px rgba(0,0,0,.12),inset 0 0 30px rgba(255,255,255,.08);pointer-events:none}
+.capture-badge{position:absolute;z-index:6;left:.75rem;top:.75rem;display:flex;align-items:center;gap:.4rem;padding:.28rem .58rem;border-radius:999px;background:rgba(10,10,10,.58);color:#fff;font-size:.68rem;letter-spacing:.05em;text-transform:uppercase;backdrop-filter:blur(8px);pointer-events:none}
+.capture-badge span{width:.46rem;height:.46rem;border-radius:50%;background:#8BB5AD;box-shadow:0 0 0 3px rgba(139,181,173,.2)}
+.exposure-fill{position:absolute;inset:0;z-index:1;pointer-events:none;background:radial-gradient(ellipse 39% 53% at 50% 49%,rgba(255,255,255,0) 0 52%,rgba(255,252,242,calc(var(--halo-screen-strength) * .72)) 69%,rgba(255,252,242,var(--halo-screen-strength)) 100%)}
+html[data-screen-flash="true"] .capture-frame{border-color:#FFFDF5;box-shadow:0 0 0 5px #FFFDF5,0 0 72px rgba(255,250,232,.8)}
+html[data-screen-flash="true"] .capture-badge span{background:#FFFDF5;box-shadow:0 0 0 4px rgba(255,253,245,.28)}
+.exposure-halo{position:absolute;z-index:5;inset:0;color:rgba(255,255,255,.82);pointer-events:none}
+.exposure-halo svg{width:100%;height:100%;display:block;overflow:visible;pointer-events:none}
+.halo-track,.halo-progress{fill:none;vector-effect:non-scaling-stroke}
+.halo-track{stroke:currentColor;stroke-width:2;opacity:.45}
+.halo-progress{stroke:var(--huang);stroke-width:4;stroke-linecap:round;stroke-dasharray:100;stroke-dashoffset:100;filter:drop-shadow(0 0 5px color-mix(in srgb,var(--huang) 70%,transparent));transition:stroke .2s ease,stroke-dashoffset .16s linear}
+.exposure-halo[data-state="adjust"]{color:var(--huang)}
+.exposure-halo[data-state="perfect"]{color:var(--qing)}
+.exposure-halo[data-state="perfect"] .halo-track,.exposure-halo[data-state="perfect"] .halo-progress{stroke:var(--qing);filter:drop-shadow(0 0 10px color-mix(in srgb,var(--qing) 85%,transparent));animation:halo-perfect 1.25s ease-in-out infinite}
+@keyframes halo-perfect{50%{opacity:.58;stroke-width:6}}
+.capture-expectation{text-align:center;margin-top:.55rem}
+.illumination-wash{position:absolute;inset:0;z-index:2;pointer-events:none;opacity:0;transition:background-color .22s linear,opacity .22s linear}
+.illumination-choice{margin-top:1rem}
+.illumination-choice[data-selected="true"]{border-color:var(--qing);box-shadow:inset 0 0 0 1px var(--qing)}
+.illumination-choice label{display:flex;align-items:flex-start;gap:.7rem;font-size:.88rem;line-height:1.5}
+.illumination-choice input{width:1.1rem;height:1.1rem;margin-top:.2rem;flex:none;accent-color:var(--qing)}
+.illumination-choice-status{margin:.65rem 0 0 1.8rem;font-size:.76rem;opacity:.76}
+.illumination-state{display:inline-flex;margin:0 0 .5rem;padding:.28rem .55rem;border:1px solid var(--qing);border-radius:999px;color:var(--qing);font-size:.7rem;letter-spacing:.04em}
+.illumination-state[hidden]{display:none}
+.capture-status{margin:.85rem 0 0}
+.capture-progress-head{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:.45rem;font-size:.72rem;letter-spacing:.04em}
+.capture-progress-head strong{font-weight:600}.capture-progress-head span{opacity:.66}
+.capture-guide{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,1fr);gap:.3rem}
+.capture-guide li{display:grid;justify-items:center;gap:.25rem;padding:.15rem 0;color:color-mix(in srgb,var(--qise-ink) 58%,transparent);font-size:.68rem}
+.capture-guide li::before{content:"";width:.62rem;height:.62rem;border:2px solid var(--qise-border);border-radius:50%}
+.capture-guide li[data-state="ready"]{color:var(--qise-ink)}
+.capture-guide li[data-state="ready"]::before{background:var(--qing);border-color:var(--qing);box-shadow:0 0 0 3px color-mix(in srgb,var(--qing) 15%,transparent)}
+.capture-guide li[data-state="adjust"]{color:var(--huang);font-weight:600}
+.capture-guide li[data-state="adjust"]::before{border-color:var(--huang);box-shadow:0 0 0 3px color-mix(in srgb,var(--huang) 15%,transparent)}
+.capture-coach{margin:.7rem 0 0;padding:1rem;border:1px solid color-mix(in srgb,var(--huang) 50%,var(--qise-border));border-radius:18px;background:linear-gradient(135deg,color-mix(in srgb,var(--huang) 10%,var(--qise-surface)),var(--qise-surface));box-shadow:0 12px 30px color-mix(in srgb,var(--qise-shadow) 50%,transparent)}
+.capture-coach[data-state="ready"]{border-color:color-mix(in srgb,var(--qing) 65%,var(--qise-border));background:linear-gradient(135deg,color-mix(in srgb,var(--qing) 13%,var(--qise-surface)),var(--qise-surface))}
+.capture-coach .eyebrow{margin-bottom:.2rem;color:inherit;opacity:.62}
+.capture-coach h2{font-family:var(--passage);font-size:1.22rem;line-height:1.25;margin:0}
+.capture-coach-detail{margin:.35rem 0 0;font-size:.82rem;line-height:1.5;opacity:.76}
+.capture-help{margin:.65rem 0 0;font-size:.76rem;opacity:.7}
+.capture-actions{display:grid;grid-template-columns:1fr 1fr;gap:.45rem;margin-top:.8rem}
+.capture-actions button{font-size:.78rem;min-height:44px;padding:.45rem .7rem;border-color:var(--qise-border);border-radius:12px}
+.capture-actions button[data-emphasis="true"]{grid-column:1/-1;background:var(--qise-ink);border-color:var(--qise-ink);color:var(--qise-action-fg)}
+.capture-secondary-actions{display:flex;justify-content:center;margin-top:.55rem}
+.capture-secondary-actions button{min-height:36px;padding:.25rem .55rem;border:0;text-decoration:underline;text-underline-offset:.18em;font-size:.72rem;opacity:.72}
+.upload-panel{margin-top:1rem}
+.upload-panel h2{font-size:1.05rem;margin-bottom:.35rem}
+.selfie-tips{margin:.65rem 0 .9rem;padding-left:1.2rem;font-size:.84rem}
+.selfie-tips li{margin:.25rem 0}
+.file-button{display:flex;align-items:center;justify-content:center;min-height:48px;padding:.65rem 1rem;border-radius:10px;background:var(--qise-ink);color:var(--qise-action-fg);cursor:pointer;text-align:center}
+.file-button:focus-within{outline:3px solid var(--chi);outline-offset:2px}
+.visually-hidden-input{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.selfie-status{min-height:1.5em;margin:.55rem 0 0}
+
+/* 360px is the floor. Below the wrapper padding, nothing is allowed to force
+   a horizontal scroll. */
+@media (max-width:360px){
+  .wrap{padding:1rem .7rem 2.5rem}
+  .courts{flex-direction:column}
+  .welcome-hero h1{font-size:2rem}
+}
+@media (max-width:480px){
+  .app-head{flex-wrap:nowrap;margin-bottom:1.25rem}
+  .privacy-mark{display:none}
+  .capture-frame video,.capture-frame canvas{height:min(46svh,28rem)}
+  .palace-grid{grid-template-columns:1fr}
+  .today-next{grid-template-columns:1fr}
+  .today-next button{width:100%}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="app-head">
+  <div class="wordmark">Mien Shiang</div>
+  <div class="head-actions">
+    <div class="privacy-mark">On-device face scanner</div>
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-pressed="false">Dark mode</button>
+  </div>
+</header>
+
+<!-- ═══ Phase 0 — the consent gate ══════════════════════════════════════
+     Marked as a disclaimer for the copy lint. That exemption covers the
+     BLOCKLIST only: disease names and assertive phrasing are still rejected
+     here, and this text makes no claim about the reader. -->
+<section class="screen" id="screen-consent" data-active="true" aria-labelledby="consent-h">
+  <div data-copy="disclaimer">
+    <div class="consent-step" id="consent-step-purpose">
+      <p class="consent-progress">1 of 2 · Welcome</p>
+      <div class="welcome-hero">
+        <div class="welcome-mark" aria-hidden="true">M/S</div>
+        <p class="eyebrow">A private face reading</p>
+        <h1 id="consent-h">See what today’s face is quietly showing.</h1>
+        <p class="welcome-lede">One guided scan turns the colours in your face into a short reflection rooted in Mien Shiang tradition — written to be felt, not decoded.</p>
+      </div>
+      <ul class="promise-list">
+        <li>Your photo stays on this phone and is discarded after the scan.</li>
+        <li>The reading compares you only with your own previous scans.</li>
+        <li>This is entertainment and self-reflection, not a rating or a medical opinion.</li>
+      </ul>
+      <div class="consent-actions"><button class="primary wide" id="consent-next" type="button">Begin my reading</button></div>
+      <p class="muted"><a href="./privacy.html">Read the privacy policy</a></p>
+    </div>
+
+    <div class="consent-step" id="consent-step-privacy" hidden>
+      <p class="consent-progress">2 of 2 · Privacy</p>
+      <p class="eyebrow">Your face stays here</p>
+      <h1>Your face stays with you.</h1>
+      <div class="surface privacy-copy"><p><strong>During the scan.</strong> Your camera image or chosen selfie and a
+        temporary 478-point face map are processed only on this device to find
+        the areas being measured and calculate facial proportions. Neither leaves the device:
+        never uploaded, never stored.
+        Both are discarded after the reading.</p>
+      <p><strong>After the scan.</strong> Only small colour measurements, derived proportion
+        readings and the written reading stay on this device, so future scans can be
+        compared with your own history.
+        Delete everything at any time.</p></div>
+      <p>For entertainment and self-reflection only — not a medical or identity check.</p>
+      <details class="muted"><summary>Why explicit consent is required</summary><p>The app temporarily generates a face map, facial-proportion observations and new colour observations from your camera or chosen selfie. The map is discarded immediately; only the derived reading stays in this browser and nothing reaches us. You should understand and choose that processing before it begins. The optional screen-light experiment is a separate choice below.</p></details>
+      <div class="surface illumination-choice" id="illumination-choice" data-selected="false">
+        <label for="illumination-opt-in">
+          <input id="illumination-opt-in" type="checkbox">
+          <span><strong>Optional screen-light experiment.</strong> The screen can slowly show neutral, blue and green while scanning. It checks only whether the camera sees an expected change; it never identifies you, never blocks the reading and stores no response data. Leave this off if changing light causes discomfort.</span>
+        </label>
+        <p class="illumination-choice-status" id="illumination-choice-status" role="status" aria-live="polite">Off — the reading will use the normal camera only.</p>
+      </div>
+      <div class="consent-actions">
+        <button id="consent-back" type="button">Back</button>
+        <button class="primary" id="consent-grant" type="button">Agree &amp; open camera</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ Phase 4 — capture ════════════════════════════════════════════════ -->
+<section class="screen" id="screen-capture" aria-labelledby="capture-h">
+  <p class="eyebrow">Face scan</p>
+  <h1 id="capture-h">Step into the frame</h1>
+  <div class="capture-frame" id="capture-frame" data-preview-lift="false"><video id="preview" playsinline muted autoplay aria-label="Camera preview"
+         style="width:100%;transform:scaleX(-1)"></video>
+    <canvas id="selfie-preview" hidden aria-label="Selected selfie preview"></canvas>
+    <div class="exposure-fill" id="exposure-fill" hidden aria-hidden="true"></div>
+    <div class="face-guide" aria-hidden="true"></div>
+    <div class="exposure-halo" id="exposure-halo" data-state="seeking" data-dragging="false"
+         aria-hidden="true">
+      <svg viewBox="0 0 360 500" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+        <ellipse class="halo-track" cx="180" cy="250" rx="116" ry="190" pathLength="100"></ellipse>
+        <ellipse class="halo-progress" data-halo-progress cx="180" cy="250" rx="116" ry="190"
+                 pathLength="100"></ellipse>
+      </svg>
+    </div>
+    <div class="capture-badge" aria-hidden="true"><span></span> Auto capture</div>
+    <div class="illumination-wash" id="illumination-wash" hidden aria-hidden="true"></div>
+  </div>
+
+  <div class="capture-status">
+    <p class="illumination-state" id="illumination-state" hidden></p>
+    <div class="capture-progress-head"><strong>Photo check</strong><span id="capture-ready-count">0 of 4 ready</span></div>
+    <ul class="capture-guide" id="capture-guide" aria-label="Scan readiness">
+      <li data-guide="frame" data-state="waiting">Face</li>
+      <li data-guide="light" data-state="waiting">Light</li>
+      <li data-guide="camera" data-state="waiting">Clear</li>
+      <li data-guide="steady" data-state="waiting">Still</li>
+    </ul>
+    <section class="capture-coach" id="capture-coach" data-state="adjust" role="status" aria-live="polite" aria-atomic="true">
+      <p class="eyebrow">Do this now</p>
+      <h2 id="gate-line">Opening the camera</h2>
+      <p class="capture-coach-detail" id="gate-detail">Bring your face into the oval.</p>
+      <div class="capture-actions">
+        <button id="screen-light" type="button" aria-pressed="false" hidden>Turn on screen flash</button>
+        <button id="use-current-light" type="button" hidden>Use this light anyway</button>
+        <button id="refocus-camera" type="button" hidden>Refocus camera</button>
+      </div>
+    </section>
+  </div>
+  <svg class="spark" id="gate-ring" viewBox="0 0 100 6" aria-hidden="true">
+    <line x1="0" y1="3" x2="100" y2="3" stroke="var(--qise-track)" stroke-width="4" />
+    <line class="ring-fill" id="ring-fill" x1="0" y1="3" x2="100" y2="3"
+          stroke="var(--chi)" stroke-width="4" stroke-dasharray="100" stroke-dashoffset="100" />
+  </svg>
+  <p class="muted capture-expectation">No shutter needed. Once the guide turns ready, capture takes about one second.</p>
+  <p class="capture-help" id="capture-help" hidden>The scan will not wait on light forever. Once your face and camera are ready, you can continue with uneven room light at reduced confidence.</p>
+  <div class="capture-secondary-actions">
+    <button id="restart-capture" type="button">Restart camera</button>
+  </div>
+  <section class="surface upload-panel" aria-labelledby="selfie-upload-h">
+    <p class="eyebrow">Camera fallback</p>
+    <h2 id="selfie-upload-h">Or choose a clear selfie</h2>
+    <p class="muted">The photo is checked and measured only on this device, then discarded.</p>
+    <ul class="selfie-tips">
+      <li>Face the camera straight on, at eye level, with your whole face visible.</li>
+      <li>Use soft daylight or a plain white light in front of you — not behind you.</li>
+      <li>Remove tinted glasses, hats and anything covering the eyes or cheeks.</li>
+      <li>Choose an original, unedited photo with no beauty filter or portrait blur.</li>
+    </ul>
+    <label class="file-button" for="selfie-upload">
+      Choose a selfie
+      <input class="visually-hidden-input" id="selfie-upload" type="file" accept="image/*">
+    </label>
+    <p class="muted selfie-status" id="selfie-status" role="status" aria-live="polite"></p>
+  </section>
+</section>
+
+<!-- ═══ Phase 9 — the reading ════════════════════════════════════════════ -->
+<section class="screen" id="screen-reading" aria-labelledby="reading-h">
+  <nav class="reading-tabs" role="tablist" aria-label="Reading views">
+    <button type="button" role="tab" data-reading-tab="today" aria-selected="true">Today</button>
+    <button type="button" role="tab" data-reading-tab="story" aria-selected="false">Story</button>
+    <button type="button" role="tab" data-reading-tab="pattern" aria-selected="false">Pattern</button>
+    <button type="button" role="tab" data-reading-tab="why" aria-selected="false" id="reading-tab-why" hidden>Why</button>
+  </nav>
+
+  <section class="reading-panel" data-reading-panel="today" role="tabpanel">
+    <div class="reading-hero">
+      <p class="reading-stage" id="reading-stage">First impression</p>
+      <div class="reading-aura"><div class="seal-frame" id="reading-seal"></div></div>
+      <p class="eyebrow">Today’s note</p>
+      <h1 class="reading-hook" id="reading-h"><span id="reading-hook"></span></h1>
+      <p class="reading-verdict" id="reading-verdict"></p>
+      <div class="today-next">
+        <p><strong>Your reading is ready.</strong><br>Enter the complete twelve-palace map and choose the symbol that holds your attention.</p>
+        <button type="button" id="today-palaces">Enter 12 palaces</button>
+      </div>
+    </div>
+    <!-- Creative enhancement: the landing screen now offers one immediate
+         ritual and two explicit next actions instead of a stack of reports. -->
+    <section class="today-ritual" aria-labelledby="today-ritual-h">
+      <p class="eyebrow">Today’s 60-second ritual</p>
+      <h2 id="today-ritual-h">Choose one thing worth carrying forward.</h2>
+      <p class="muted">Read your note once. Name the word that catches. Leave the rest here.</p>
+      <div class="palace-orbit" aria-label="All twelve palaces available">
+        <div class="palace-stars" aria-hidden="true">
+          <span style="--star:0"></span><span style="--star:1"></span><span style="--star:2"></span><span style="--star:3"></span><span style="--star:4"></span><span style="--star:5"></span>
+          <span style="--star:6"></span><span style="--star:7"></span><span style="--star:8"></span><span style="--star:9"></span><span style="--star:10"></span><span style="--star:11"></span>
+        </div>
+        <strong>12 of 12 palaces revealed</strong>
+      </div>
+      <div class="today-shortcuts">
+        <button type="button" id="today-pattern">See what changed</button>
+        <button type="button" id="today-delight">Share this moment</button>
+      </div>
+    </section>
+    <section class="composition-card" aria-labelledby="composition-h">
+      <div class="composition-head">
+        <div><p class="eyebrow">Five-colour impression</p><h2 id="composition-h">Today’s palette</h2></div>
+        <span class="composition-basis" id="composition-basis"></span>
+      </div>
+      <div id="reading-composition"></div>
+    </section>
+    <section class="integrated-card" id="reading-integrated" aria-labelledby="integrated-h" hidden></section>
+    <p class="reflection" id="reading-reflection"></p>
+    <div class="surface" id="reflection-today" hidden></div>
+    <p class="muted reading-privacy">Made on this device. The face photo is discarded.</p>
+  </section>
+
+  <section class="reading-panel" data-reading-panel="story" role="tabpanel" hidden>
+    <p class="eyebrow" id="story-eyebrow">The tradition’s reading</p>
+    <h1 id="story-heading">The story beneath today</h1>
+    <div class="surface"><p class="story-passage" id="reading-passage"></p></div>
+    <div class="surface" id="reflection-story" hidden></div>
+    <div class="surface" id="reflection-compare" hidden></div>
+    <div class="structural-story" id="reading-structure-story"></div>
+    <p class="reflection" id="reading-reflection-story"></p>
+    <div class="chips" id="reading-tags"></div>
+  </section>
+
+  <section class="reading-panel" data-reading-panel="pattern" role="tabpanel" hidden>
+    <p class="eyebrow">Your own pattern</p>
+    <h1>What changed — and what the scan could see</h1>
+    <p class="muted pattern-intro">These views use only your previous scans. They do not compare you with anyone else.</p>
+    <section class="pattern-progress" id="pattern-progress" aria-labelledby="pattern-progress-h"></section>
+    <div class="surface" id="pattern-range"><div class="section-label"><h2>Your recent range</h2><span class="muted">Personal range</span></div><div id="reading-gauges"></div></div>
+    <div class="section-label"><h2>Areas read clearly</h2><span class="muted">Scan coverage</span></div><div class="courts" id="reading-courts"></div>
+    <svg class="spark reading-spark" id="reading-spark" viewBox="0 0 300 44" aria-label="Thirty days of lustre"></svg>
+    <div id="reading-notices"></div>
+  </section>
+
+  <section class="reading-panel" data-reading-panel="why" role="tabpanel" hidden>
+    <p class="eyebrow">Why this reading</p>
+    <h1>How today&rsquo;s reading was assembled</h1>
+    <p class="muted">Every sentence above, the layer it came from, and the values that produced it.</p>
+    <div id="reflection-why"></div>
+  </section>
+
+  <div class="actions reading-actions">
+    <button class="primary wide" id="share-today">Share my colour seal</button>
+    <button id="go-history">Your column</button>
+    <button id="go-capture">Scan again</button>
+  </div>
+  <p class="muted share-status" id="share-status" role="status" aria-live="polite"></p>
+</section>
+
+<!-- ═══ Phase 9 — the column ═════════════════════════════════════════════ -->
+<section class="screen" id="screen-history" aria-labelledby="history-h">
+  <p class="eyebrow">Your private ritual</p>
+  <h1 id="history-h">Your colour column</h1>
+  <p class="muted">Each scan adds one mark. Four comparable readings reveal the first personal shift.</p>
+  <div class="segmented" aria-label="Share period">
+    <button type="button" data-cadence="today" aria-pressed="false">Today</button>
+    <button type="button" data-cadence="week" aria-pressed="true">7 readings</button>
+    <button type="button" data-cadence="fortnight" aria-pressed="false">14 readings</button>
+  </div>
+  <div class="history" id="history-column"></div>
+  <div class="actions">
+    <button class="primary wide" id="share-column">Share 7 readings</button>
+    <button id="export-all">Export readings</button>
+    <button id="back-reading">Back to today</button>
+    <button class="danger wide" id="withdraw">Withdraw consent and delete everything</button>
+  </div>
+  <p class="muted share-status">Share cards never contain your face photo or raw measurements.</p>
+</section>
+
+</div>
+<script type="module" src="./ui/qise/app.js"></script>
+</body>
+</html>
