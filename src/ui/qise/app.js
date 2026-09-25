@@ -33,7 +33,7 @@ import { BurstController, createMonotonicTimestamps } from "../../qise/capture-i
 import { createFrameScheduler } from "../../qise/frame-scheduler.js";
 import { faceGuideRect } from "../../qise/frame-geometry.js";
 import {
-  fitSelfieDimensions, validateSelfieDimensions, validateSelfieFile,
+  fitSelfieDimensions, validateSelfieDimensions, validateSelfieFile, drawSelfie,
 } from "../../qise/upload.js";
 import { readRois } from "../../qise/rois.js";
 import { headPose } from "../../qise/pose.js";
@@ -945,7 +945,9 @@ async function runSelfie(file) {
     canvas.height = fitted.height;
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
     if (!ctx) throw new Error("This browser could not prepare the selfie.");
-    ctx.drawImage(decoded.source, 0, 0, fitted.width, fitted.height);
+    // Flipped here, before landmarking, when the person marks the photo as
+    // mirrored — otherwise the two cheeks swap (M1a fix (f)).
+    drawSelfie(ctx, decoded.source, fitted.width, fitted.height, { mirrored: $("selfie-mirrored").checked });
     decoded.release();
     decoded = null;
 

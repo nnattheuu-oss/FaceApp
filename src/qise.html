@@ -383,6 +383,7 @@ html[data-screen-flash="true"] .capture-badge span{background:#FFFDF5;box-shadow
 .file-button:focus-within{outline:3px solid var(--chi);outline-offset:2px}
 .visually-hidden-input{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 .selfie-status{min-height:1.5em;margin:.55rem 0 0}
+.selfie-mirror{display:flex;gap:.5rem;align-items:flex-start;margin:0 0 .8rem;font-size:.86rem}
 
 /* 360px is the floor. Below the wrapper padding, nothing is allowed to force
    a horizontal scroll. */
@@ -534,6 +535,10 @@ html[data-screen-flash="true"] .capture-badge span{background:#FFFDF5;box-shadow
       <li>Remove tinted glasses, hats and anything covering the eyes or cheeks.</li>
       <li>Choose an original, unedited photo with no beauty filter or portrait blur.</li>
     </ul>
+    <label class="selfie-mirror">
+      <input type="checkbox" id="selfie-mirrored">
+      This photo is mirrored (writing in it reads backwards)
+    </label>
     <label class="file-button" for="selfie-upload">
       Choose a selfie
       <input class="visually-hidden-input" id="selfie-upload" type="file" accept="image/*">
