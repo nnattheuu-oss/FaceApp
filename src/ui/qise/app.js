@@ -17,7 +17,7 @@
  * behaviour the Phase 0 assertion is there to guarantee.
  */
 import {
-  createConsent, assertConsentGranted, consentBootTarget,
+  createConsent, assertConsentGranted, consentBootAction,
 } from "../../qise/consent.js";
 import { paletteCss } from "./palette.js";
 import {
@@ -1949,9 +1949,22 @@ async function boot() {
   });
 
   const last = (await store.all()).slice(-1)[0];
-  const destination = consentBootTarget(consent.isGranted(), Boolean(last));
-  if (destination === "screen-reading") await renderReading(last);
-  else show(destination);
+  const action = consentBootAction(consent.isGranted(), Boolean(last));
+  if (action.screen === "screen-reading") {
+    await renderReading(last);
+  } else if (action.startCapture) {
+    // Consented, no reading yet: open the camera rather than landing on a
+    // capture screen nothing will ever start (M1a boot fix).
+    try {
+      await runCapture();
+    } catch (err) {
+      console.error("qise: capture failed at boot", err);
+      $("gate-line").textContent = describeCameraError(err);
+      show("screen-capture");
+    }
+  } else {
+    show(action.screen);
+  }
 }
 
 boot().catch((err) => {
