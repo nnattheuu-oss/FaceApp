@@ -1,4 +1,4 @@
-> **Proposed supersession (25 Sep 2026): DR-2026-09-25-ANALYTICS-CARD-9.** Owner approval is pending. If approved, this proposal is superseded: there is no first-party telemetry at M1, the funnel comes from Play Console and RevenueCat, and device performance is covered by the release-gate device matrix (`docs/MONETISATION_AUDIT_2026-09.md` D4 §6).
+> **SUPERSEDED (25 Sep 2026) by DR-2026-09-25-ANALYTICS-CARD-9, approved by the owner (`DR-2026-09-25-SIX-PROPOSALS-APPROVED`):** there is no first-party telemetry at M1, the funnel comes from Play Console and RevenueCat, and device performance is covered by the release-gate device matrix (`docs/MONETISATION_AUDIT_2026-09.md` D4 §6).
 
 # Zero-Knowledge Telemetry (ZKT) — scope document, NOT a decision
 

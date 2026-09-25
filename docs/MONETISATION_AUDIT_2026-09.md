@@ -1,8 +1,7 @@
 # Monetisation audit and programme — September 2026
 
 Status: owner-approved programme (25 September 2026). Binding rulings are recorded in
-`docs/DECISION_REGISTER.md` as `DR-2026-09-25-*`. Where this document says **proposed**, the owner has
-not yet approved it (D6 lists every approval owed). Line references are against the M0 head unless noted.
+`docs/DECISION_REGISTER.md` as `DR-2026-09-25-*`. **All six entries this document calls "proposed" were approved on 25 September 2026** (`DR-2026-09-25-SIX-PROPOSALS-APPROVED`). The one narrowing: no price point is approved yet. Line references are against the M0 head unless noted.
 
 **Labels.** "Estimate:" marks a number with no primary source. "Contested:" marks sources that
 disagree. Everything else is cited.
@@ -458,6 +457,26 @@ Per device class:
 - **Bad light** → abstention or the honest reduced-confidence note.
 - **Deep skin in dim light:** capture success rate recorded separately per tone band (`rois.js` fairness note). A tone-band gap above 15 points blocks the gate.
 
+**Device-matrix additions from M1a (owner directive, 25 September 2026).**
+
+`e2e/beta-camera-integration.spec.js` holds the only four automated tests that drive the real camera → MediaPipe → gate pipeline. They run in CI's `browser` job (`npm run test:browser`) and passed 4/4 in the M1a session. But their fixture (`tests/fixtures/synthetic-face.y4m`) is a skin-toned ellipse, and MediaPipe finds no face in it. So the **face-dependent half of each test has never been executed by anything**. Each row below must be run on every device class above, on the Capacitor debug build:
+
+| Automated test (what it proves on the ellipse) | Never executed; run on device |
+|---|---|
+| `synthetic camera feed genuinely attaches and MediaPipe initialises`: the stream attaches, the WASM runtime starts | MediaPipe returns a 478-point mesh for a real face, on the GPU delegate and on the CPU fallback |
+| `gates evaluate real frames: gate line settles on a genuine face-detection instruction`: the gate line shows a real instruction; no reading appears | Gates move from red to green on a real face; the 650 ms hold completes; the 9-frame burst completes; a reading renders |
+| `media stream termination: camera stops cleanly when capture ends or user aborts`: a reload drops the stream | The camera light goes off after a finished reading, after "Restart camera", and after backgrounding. After backgrounding, the capture restarts by itself (M1a fix c) |
+| `gate feedback renders consistently as synthetic frames are processed`: the instruction never blanks | The instruction tracks real pose, distance and light changes on a real face, with no stalls or blank frames |
+
+Plus the M1a fixes that no browser fixture can reach:
+- **Two people in frame:** refused every time (fix a).
+- **Face leaves and returns mid-hold or mid-burst:** no reading completes without a fresh hold (fix b).
+- **Offline after an app update:** the scan still works (fix d: vendor precache).
+- **Airplane mode on first scan:** the model-load copy is shown, not the camera-permission copy (fix d).
+- **"Use this light anyway" under strongly coloured light:** it is not offered (fix e).
+- **Mirrored selfie from a phone that saves mirrored:** with the toggle on, cheeks keep their sides (fix f).
+- **Boot:** consent granted, app closed before the first reading, app reopened → the camera starts by itself (boot fix).
+
 **M2 detail.**
 - **4.3(b) defence:**
   - Position it as "Chinese face reading and face-colour journal".
@@ -521,13 +540,7 @@ Per device class:
    - Create the account and project.
    - Link the Play service-account credentials.
    - Create the products and base plans from D4 §1 in Play, and the offerings and entitlement `full` in RevenueCat.
-6. **Approve or reject the proposed DR entries:**
-   - CATALOGUE-PRICING
-   - STORE-ARTEFACT-SCOPE
-   - REFLECTION-PUBLIC-DEFAULT
-   - RELEASE-CHECK-L05
-   - ANALYTICS-CARD-9
-   - COMPAT-REMOTE-FIRST
+6. ~~Approve or reject the proposed DR entries~~ **Done, 25 Sep 2026:** all six are approved (`DR-2026-09-25-SIX-PROPOSALS-APPROVED`). CATALOGUE-PRICING is approved **as structure only; no price points are approved**, and those stay pending the D4 lock.
 7. **Buy a custom domain** and point the web funnel at it. App Links need `assetlinks.json` at the origin root; a GitHub Pages project site can't serve it.
 8. **Run the device matrix** on the M1c debug build with the closed testers. Include deep-skin participants in dim light, and log results against the gate criteria.
 9. **Confirm the EU posture** (recommended: stay excluded).

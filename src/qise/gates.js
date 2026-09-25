@@ -56,6 +56,16 @@ export const ASSISTED_LIMITS = Object.freeze({
 export const ASSISTABLE_GATES = Object.freeze(Object.keys(ASSISTED_LIMITS));
 export const LIGHT_OVERRIDE_DELAY_MS = 5000;
 export const OVERRIDABLE_LIGHT_GATES = Object.freeze(["sidelight", "illuminant"]);
+/**
+ * How far past its strict limit an overridable light gate may be and still be
+ * accepted by "Use this light anyway" (M1a fix (e)). Side light has no entry
+ * on purpose: an unevenly lit face is still measurable. Coloured light does:
+ * beyond ASSISTED_LIMITS.illuminant no correction is trustworthy, and an
+ * override-accepted reading enters the baseline at assisted confidence.
+ */
+export const OVERRIDE_LIMITS = Object.freeze({ illuminant: ASSISTED_LIMITS.illuminant });
+const withinOverrideLimit = (failure) => !Number.isFinite(OVERRIDE_LIMITS[failure.id])
+  || (Number.isFinite(failure.value) && failure.value <= OVERRIDE_LIMITS[failure.id]);
 
 /** Outer eye corners. See the note in evaluateGates on which span this is. */
 export const OUTER_CANTHI = Object.freeze([33, 263]);
@@ -487,7 +497,10 @@ export function canUseCurrentLight(report, elapsedMs = 0) {
     // Motion is still enforced after the choice; it must not make the choice
     // flicker away while a thumb is moving towards the button.
     && failures.every((failure) =>
-      (allowed.has(failure.id) || failure.id === "motion") && !failure.unevaluated);
+      (allowed.has(failure.id) || failure.id === "motion") && !failure.unevaluated)
+    // Never offer a button that then changes nothing: a light beyond its
+    // override cap stays a hard stop (M1a fix (e)).
+    && failures.every((failure) => !allowed.has(failure.id) || withinOverrideLimit(failure));
 }
 
 export function captureGuide(report) {
@@ -599,7 +612,8 @@ export function evaluateGates(frameStats, landmarks, scleraResult, options = {})
     const alreadyTolerated = new Set(tolerated.map((failure) => failure.id));
     for (const failure of failures) {
       if (OVERRIDABLE_LIGHT_GATES.includes(failure.id)
-          && !failure.unevaluated && !alreadyTolerated.has(failure.id)) {
+          && !failure.unevaluated && !alreadyTolerated.has(failure.id)
+          && withinOverrideLimit(failure)) {
         tolerated.push(failure);
       }
     }

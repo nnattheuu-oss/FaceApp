@@ -63,6 +63,18 @@ export function consentBootTarget(consentGranted, hasReading) {
   return hasReading ? "screen-reading" : "screen-capture";
 }
 
+/**
+ * What the boot must DO, not only where it lands (M1a boot fix). A consented
+ * person with no reading used to land on screen-capture with nothing opening
+ * the camera — the only runCapture() call sits behind the consent button they
+ * never see again. Only a real grant (`=== true`) can start the camera.
+ * @returns {{screen:string, startCapture:boolean}}
+ */
+export function consentBootAction(consentGranted, hasReading) {
+  const screen = consentBootTarget(consentGranted, hasReading);
+  return { screen, startCapture: screen === "screen-capture" && consentGranted === true };
+}
+
 function defaultStorage() {
   try {
     if (typeof localStorage !== "undefined" && localStorage) return localStorage;

@@ -1,5 +1,7 @@
 /* Pure policy for the on-device selfie fallback. Decoding stays in the UI. */
 
+import { captureInstruction } from "./gates.js";
+
 export const MAX_SELFIE_BYTES = 15 * 1024 * 1024;
 export const MAX_SELFIE_EDGE = 2048;
 export const MIN_SELFIE_EDGE = 480;
@@ -38,4 +40,34 @@ export function validateSelfieDimensions(width, height) {
     return { ok: false, message: "Choose a clearer selfie at least 480 pixels on its shortest side." };
   }
   return { ok: true, message: null };
+}
+
+/**
+ * Draw a decoded selfie into the measurement canvas, flipping it first when
+ * the person says the photo is mirrored (M1a fix (f)). The PIXELS are flipped,
+ * as the classic path does, so landmarks, pose, sclera and every region see
+ * one un-mirrored face and `mirrored: false` stays true of the buffer.
+ * `mirrored` is required, never defaulted — the same rule as rois.js, because
+ * a silent default is how laterality inverts unnoticed.
+ */
+export function drawSelfie(ctx, source, width, height, { mirrored } = {}) {
+  if (typeof mirrored !== "boolean") {
+    throw new TypeError("drawSelfie requires an explicit boolean `mirrored`");
+  }
+  if (mirrored) {
+    ctx.translate(width, 0);
+    ctx.scale(-1, 1);
+  }
+  ctx.drawImage(source, 0, 0, width, height);
+  if (mirrored) ctx.setTransform(1, 0, 0, 1, 0, 0);
+}
+
+/**
+ * The one line a refused selfie shows. Routed through captureInstruction, as
+ * the live path is, never `failures[0].message`: a BLOCKED gate sorts first
+ * at margin -1, so the raw first message names a cause nobody measured
+ * (CLAUDE.md item 54; M1a row 23).
+ */
+export function selfieGateMessage(report) {
+  return captureInstruction(report).title;
 }

@@ -87,7 +87,11 @@ test("every module in the service worker SHELL exists on disk", () => {
   // sw.js precaching a file that isn't there is what silently killed offline
   // support once already.
   const sw = readFileSync(join(SRC, "sw.js"), "utf8");
-  const shell = [...sw.matchAll(/"(\.\/[^"]*)"/g)].map((m) => m[1]);
+  // Scoped to the SHELL array: VENDOR_SHELL names build-only files under
+  // dist/vendor/ that never exist in src/, and tests/sw-precache.test.js
+  // checks those against what scripts/build.js actually vendors.
+  const shellBlock = sw.match(/const SHELL = \[([\s\S]*?)\];/)?.[1] || "";
+  const shell = [...shellBlock.matchAll(/"(\.\/[^"]*)"/g)].map((m) => m[1]);
   assert.ok(shell.length > 20, `expected a full SHELL list, found ${shell.length}`);
 
   const missing = [];

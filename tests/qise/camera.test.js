@@ -330,6 +330,9 @@ test("teardown ZEROES the pixels rather than only dropping the reference", () =>
     // False because this scratch never took one, not because teardown skipped
     // it — the paired assertion is in "releaseCapture hands the screen back".
     wakeLockReleased: false,
+    // Same reasoning: no lifecycle watcher on this scratch. The positive half
+    // is in tests/qise/capture-lifecycle.test.js (M1a fix (c)).
+    lifecycleDisposed: false,
   });
 });
 

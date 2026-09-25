@@ -17,20 +17,23 @@
  * behaviour the Phase 0 assertion is there to guarantee.
  */
 import {
-  createConsent, assertConsentGranted, consentBootTarget,
+  createConsent, assertConsentGranted, consentBootAction,
 } from "../../qise/consent.js";
 import { paletteCss } from "./palette.js";
 import {
-  openCamera, attachCameraPreview, describeCameraError, createLandmarkerGuarded,
-  releaseCapture, GreenLatch, PolygonSmoother, BURST_FRAMES, trimmedMedianLab, reduceBurst,
+  openCamera, attachCameraPreview, describeCameraError, describeSelfieError, loadFaceModel,
+  createLandmarkerGuarded, releaseCapture, GreenLatch, PolygonSmoother, BURST_FRAMES, trimmedMedianLab, reduceBurst,
   negotiateCaptureMode, canNegotiateCaptureMode, exposureAssistState, releaseCaptureMode,
   ensureContinuousFocus, requestCameraRefocus,
 } from "../../qise/camera.js";
-import { createLandmarkerWithFallback } from "../../landmarker.js";
+import {
+  createLandmarkerWithFallback, selectSingleFace, SINGLE_FACE_NUM_FACES,
+} from "../../landmarker.js";
+import { BurstController, createMonotonicTimestamps } from "../../qise/capture-integrity.js";
 import { createFrameScheduler } from "../../qise/frame-scheduler.js";
 import { faceGuideRect } from "../../qise/frame-geometry.js";
 import {
-  fitSelfieDimensions, validateSelfieDimensions, validateSelfieFile,
+  fitSelfieDimensions, validateSelfieDimensions, validateSelfieFile, drawSelfie, selfieGateMessage,
 } from "../../qise/upload.js";
 import { readRois } from "../../qise/rois.js";
 import { headPose } from "../../qise/pose.js";
@@ -41,12 +44,15 @@ import {
   illuminationFrameStable, illuminationInterruption, abandonedIlluminationSummary,
 } from "../../qise/illumination.js";
 import { createScreenWakeLock } from "../../qise/wakelock.js";
+import { watchCaptureLifecycle } from "../../qise/capture-lifecycle.js";
 import {
   evaluateGates, captureGuide, captureInstruction, canUseCurrentLight, DISTANCE_MIN_FRACTION,
 } from "../../qise/gates.js";
 import { frameStats } from "../../qise/framestats.js";
 import { computeReadingMetrics, lumRatioP90P50 } from "../../qise/metrics.js";
-import { interpretReading, readingConfidence, axesOf, planSegment, BASELINE_VERSION } from "../../qise/baseline.js";
+import {
+  interpretReading, readingConfidence, axesOf, planSegment, BASELINE_VERSION, ANCHOR_READINGS,
+} from "../../qise/baseline.js";
 import { passageFor } from "../../qise/passages.js";
 import { reflectionMode } from "../../qise/reading-flags.js";
 import { reflectionFor } from "../../qise/reading-pipeline.js";
@@ -265,19 +271,27 @@ function illuminationOrderBit() {
 async function buildLandmarker(runningMode = "VIDEO") {
   // Dynamic, and only ever reached past the consent assertion.
   assertConsentGranted(consent, "FaceLandmarker");
-  const { FaceLandmarker, FilesetResolver } = await import(MEDIAPIPE_BUNDLE);
-  const fileset = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM);
-  const guardedFactory = (_resolvedFileset, options) => createLandmarkerGuarded({
-    consent, options,
-    factory: (guardedOptions) => FaceLandmarker.createFromOptions(fileset, guardedOptions),
+  // Every fetch that can fail offline sits inside loadFaceModel, so a failure
+  // reads as a model problem and not as a camera-permission one (M1a fix (d)).
+  return loadFaceModel(async () => {
+    const { FaceLandmarker, FilesetResolver } = await import(MEDIAPIPE_BUNDLE);
+    const fileset = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM);
+    const guardedFactory = (_resolvedFileset, options) => createLandmarkerGuarded({
+      consent, options,
+      factory: (guardedOptions) => FaceLandmarker.createFromOptions(fileset, guardedOptions),
+    });
+    const built = await createLandmarkerWithFallback(
+      guardedFactory,
+      fileset,
+      {
+        modelAssetPath: FACE_MODEL, runningMode, outputFaceBlendshapes: false,
+        // Two, so a second person is visible and can be refused (M1a fix (a)).
+        numFaces: SINGLE_FACE_NUM_FACES,
+      },
+      (message) => { if ($("gate-line")) $("gate-line").textContent = message; },
+    );
+    return built.landmarker;
   });
-  const built = await createLandmarkerWithFallback(
-    guardedFactory,
-    fileset,
-    { modelAssetPath: FACE_MODEL, runningMode, outputFaceBlendshapes: false },
-    (message) => { if ($("gate-line")) $("gate-line").textContent = message; },
-  );
-  return built.landmarker;
 }
 
 async function runCapture() {
@@ -355,9 +369,24 @@ async function runCapture() {
     documentRef: document,
   });
   wakeLock.acquire();
+  // If the OS takes the camera away (backgrounding, a call, a revoked
+  // permission) the loop would otherwise freeze on its last prompt. Restart
+  // the capture instead — once, and only for THIS run (M1a fix (c)).
+  const lifecycle = watchCaptureLifecycle({
+    documentRef: document,
+    track: opened.track,
+    onRecover: (reason) => {
+      if (runId !== captureRun) return;
+      console.warn("qise: camera lost, restarting the capture", reason);
+      runCapture().catch((error) => {
+        console.error("qise: capture restart failed", error);
+        $("gate-line").textContent = describeCameraError(error);
+      });
+    },
+  });
   scratch = {
     canvas, images: [], landmarks: [], stream: opened.stream, landmarker, video,
-    wakeLock,
+    wakeLock, lifecycle,
   };
 
   // ── EXPOSURE SETTLES BEFORE THE BURST CAN ARM ─────────────────────────────
@@ -373,7 +402,12 @@ async function runCapture() {
   let screenLightSince = null;
   let refocusStarted = false;
 
-  const latch = new GreenLatch();
+  // The hold AND the burst, in one pure state machine that resets on a lost
+  // face and re-gates every burst frame (src/qise/capture-integrity.js).
+  const burstControl = new BurstController();
+  // detectForVideo needs strictly increasing timestamps per landmarker, and a
+  // new landmarker is built per run, so a new sequence per run too.
+  const detectAt = createMonotonicTimestamps();
   const illuminationLatch = new GreenLatch(ILLUMINATION_READY_MS);
   // Locked decision 3, the other half: once the DARKNESS the assist was armed
   // for has been gone for a full hold's worth of time, this is the cue to turn
@@ -402,9 +436,7 @@ async function runCapture() {
   });
   let settleUntil = 0;
 
-  const burst = {};
-  let collecting = 0;
-  let lastSclera = null, lastRois = null, lastMargins = null, lastCaptureTier = null;
+  let lastSclera = null, lastRois = null;
 
   /**
    * Abandon a running screen-light session, wherever the loop noticed.
@@ -429,7 +461,7 @@ async function runCapture() {
     // The sequence changed the light on the face part-way through the hold, so
     // the seconds already banked are not seconds of the steady frame the latch
     // is meant to be measuring.
-    latch.reset();
+    burstControl.reset();
   };
 
   const stopAfterLoopError = (error) => {
@@ -492,8 +524,11 @@ async function runCapture() {
       image.data.fill(0);
       if (scratch) scratch.images = [];
     };
-    const result = landmarker.detectForVideo(video, nowMs);
-    const mesh = result && result.faceLandmarks && result.faceLandmarks[0];
+    const result = landmarker.detectForVideo(video, detectAt(nowMs));
+    // Exactly one face, or none at all: a second person is refused, never
+    // silently read in place of the first (M1a fix (a)).
+    const face = selectSingleFace(result);
+    const mesh = face.landmarks;
 
     if (mesh) {
       // z is carried through, not dropped. Without it `headPose` can only
@@ -568,7 +603,7 @@ async function runCapture() {
       if (observedScreenLightRevision !== screenLightRevision) {
         observedScreenLightRevision = screenLightRevision;
         screenLightSince = screenLightRequested ? nowMs : null;
-        latch.reset();
+        burstControl.reset();
       }
 
       // Auto-arm on DARKNESS ONLY — never on uneven light or softness, which
@@ -634,7 +669,7 @@ async function runCapture() {
       })) {
         modeNegotiationStarted = true;
         captureSettled = false;
-        latch.reset();
+        burstControl.reset();
         negotiateCaptureMode(opened.track)
           .then((negotiated) => {
             if (runId === captureRun) captureMode = negotiated.captureMode;
@@ -677,7 +712,7 @@ async function runCapture() {
             if (resumeScreenLightAfterIllumination && !screenLightDismissed) {
               setScreenLight(true);
             }
-            latch.reset();
+            burstControl.reset();
             $("illumination-state").hidden = false;
             $("illumination-state").textContent = "Colour response check complete";
             $("gate-line").textContent = "Screen-light check complete. Hold steady for the reading…";
@@ -717,7 +752,7 @@ async function runCapture() {
           showIlluminationPhase(illuminationSession.sequence[0]);
           $("illumination-state").hidden = false;
           $("illumination-state").textContent = "Colour response check · neutral";
-          latch.reset();
+          burstControl.reset();
         }
         clearFrame();
         scheduleStep();
@@ -734,7 +769,7 @@ async function runCapture() {
           && gates.failures.some((f) => f.id === "underexposed" || f.id === "overexposed")) {
         exposureReleaseStarted = true;
         captureSettled = false;
-        latch.reset();
+        burstControl.reset();
         releaseCaptureMode(opened.track)
           .then((reverted) => {
             if (runId !== captureRun) return;
@@ -760,39 +795,31 @@ async function runCapture() {
       // it is the light source, whatever the gates say — see
       // dropScreenLightLatch below, which is what actually gets the assist
       // back off again once ambient light alone looks sustainable.
-      const held = latch.update(gates.pass && captureSettled && !screenLightRequested, nowMs);
+      const held = burstControl.frame({
+        ready: gates.pass && captureSettled && !screenLightRequested,
+        nowMs,
+        settleUntil,
+        armContext: { margins: gates.margins, captureTier: gates.captureTier },
+        sample: () => Object.fromEntries(Object.entries(lastRois.rois)
+          .filter(([, roi]) => roi.pixels.length)
+          .map(([name, roi]) => [name, trimmedMedianLab(roi.pixels, color)])),
+      });
       $("ring-fill").setAttribute("stroke-dashoffset", String(100 - Math.round(held.progress * 100)));
       exposureHalo?.setCaptureState(haloStateFromCapture({
         underexposed, gatesPass: gates.pass, captureSettled, recovering: soft && refocusStarted,
       }), held.progress);
 
-      if (held.ready) {
-        if (nowMs < settleUntil) {
-          latch.reset();
-        } else {
-          collecting = BURST_FRAMES;
-          lastMargins = gates.margins;
-          lastCaptureTier = gates.captureTier;
-        }
-      }
-
-      if (collecting > 0) {
-        for (const [name, roi] of Object.entries(lastRois.rois)) {
-          if (!roi.pixels.length) continue;
-          (burst[name] ||= []).push(trimmedMedianLab(roi.pixels, color));
-        }
-        collecting--;
-        if (collecting === 0) {
-          // The NEGOTIATED mode, not the one openCamera returned — that is
-          // "pending" now, and if exposure was handed back part-way through
-          // the hold this reading was taken under "auto". The record has to
-          // say which, because captureMode is what tells a later baseline that
-          // the class of capture changed.
-          scheduler.stop();
-          await finish(burst, lastRois, lastSclera, { ...opened, captureMode },
-            history, lastMargins, illuminationSummary, lastCaptureTier, image, pts);
-          return;
-        }
+      if (held.done) {
+        // The NEGOTIATED mode, not the one openCamera returned — that is
+        // "pending" now, and if exposure was handed back part-way through
+        // the hold this reading was taken under "auto". The record has to
+        // say which, because captureMode is what tells a later baseline that
+        // the class of capture changed.
+        scheduler.stop();
+        await finish(held.burst, lastRois, lastSclera, { ...opened, captureMode },
+          history, held.armContext.margins, illuminationSummary, held.armContext.captureTier,
+          image, pts);
+        return;
       }
     } else {
       // The face is gone, so there is nothing left to sample and the wash must
@@ -805,7 +832,17 @@ async function runCapture() {
         });
         abandonIllumination(interruption.reason, nowMs);
       }
-      setCapturePrompt("Come into view", "Centre your face inside the oval.");
+      // Nothing measured on this frame may count towards the hold or survive
+      // into a burst, and the next face's motion is measured from scratch
+      // (M1a fix (b)).
+      burstControl.faceLost();
+      previous = null;
+      drift.length = 0;
+      if (face.status === "multiple") {
+        setCapturePrompt("One face at a time", "Only the person being read should be in the oval.");
+      } else {
+        setCapturePrompt("Come into view", "Centre your face inside the oval.");
+      }
       underexposedSince = null;
       softSince = null;
       refocusStarted = false;
@@ -910,7 +947,9 @@ async function runSelfie(file) {
     canvas.height = fitted.height;
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
     if (!ctx) throw new Error("This browser could not prepare the selfie.");
-    ctx.drawImage(decoded.source, 0, 0, fitted.width, fitted.height);
+    // Flipped here, before landmarking, when the person marks the photo as
+    // mirrored — otherwise the two cheeks swap (M1a fix (f)).
+    drawSelfie(ctx, decoded.source, fitted.width, fitted.height, { mirrored: $("selfie-mirrored").checked });
     decoded.release();
     decoded = null;
 
@@ -925,8 +964,14 @@ async function runSelfie(file) {
       return;
     }
 
-    const result = landmarker.detect(canvas);
-    const mesh = result?.faceLandmarks?.[0];
+    const face = selectSingleFace(landmarker.detect(canvas));
+    if (face.status === "multiple") {
+      $("gate-line").textContent = "Choose a selfie with only your face in it.";
+      $("selfie-status").textContent = "More than one face was found. The selected photo was discarded.";
+      discardSelfieScratch();
+      return;
+    }
+    const mesh = face.landmarks;
     if (!mesh) {
       $("gate-line").textContent = "Choose a selfie with one full, front-facing face.";
       $("selfie-status").textContent = "No clear face was found. The selected photo was discarded.";
@@ -950,7 +995,7 @@ async function runSelfie(file) {
     );
     renderCaptureGuide(gates);
     if (!gates.pass) {
-      $("gate-line").textContent = gates.failures[0].message;
+      $("gate-line").textContent = selfieGateMessage(gates);
       $("selfie-status").textContent = "Choose another selfie using the shot guide. This photo was discarded.";
       discardSelfieScratch();
       return;
@@ -1095,7 +1140,7 @@ async function finish(burst, rois, sclera, opened, history, gateMargins, illumin
     baselineVersion: BASELINE_VERSION,
     captureTier,
     readingState: interpreted.state,
-    baselineProgress: Math.min(4, history.filter((item) => item && item.valid !== false).length + 1),
+    baselineProgress: Math.min(ANCHOR_READINGS, history.filter((item) => item && item.valid !== false).length + 1),
     consentVersion: consent.read() && consent.read().version,
     illumination,
     // The margins from the frame that opened the burst. gates.js normalises
@@ -1595,9 +1640,9 @@ async function renderReading(reading) {
   progress.innerHTML = m.calibration.active
     ? `<p class="eyebrow">Building your baseline</p><h2 id="pattern-progress-h">${esc(m.calibration.title)}</h2>
        <p class="muted">${m.calibration.remaining === 1 ? "One more comparable scan" : `${m.calibration.remaining} more comparable scans`} will unlock your first personal change reading.</p>
-       <div class="pattern-dots" aria-label="${m.calibration.current} of 4 anchor readings">${Array.from({ length: 4 }, (_, index) =>
+       <div class="pattern-dots" aria-label="${m.calibration.current} of ${m.calibration.required} anchor readings">${Array.from({ length: m.calibration.required }, (_, index) =>
          `<span class="pattern-dot" data-filled="${index < m.calibration.current}"></span>`).join("")}</div>
-       <div class="pattern-count num">${m.calibration.current} / 4 anchors</div>`
+       <div class="pattern-count num">${m.calibration.current} / ${m.calibration.required} anchors</div>`
     : "";
   $("pattern-range").hidden = m.calibration.active;
   $("reading-spark").hidden = m.calibration.active;
@@ -1834,7 +1879,7 @@ async function boot() {
     const [file] = input.files || [];
     runSelfie(file).catch((error) => {
       console.error(error);
-      $("selfie-status").textContent = "That selfie could not be read. Choose another original photo.";
+      $("selfie-status").textContent = describeSelfieError(error);
     }).finally(() => { input.value = ""; });
   });
   $("go-capture").addEventListener("click", () => runCapture().catch((error) => {
@@ -1904,9 +1949,22 @@ async function boot() {
   });
 
   const last = (await store.all()).slice(-1)[0];
-  const destination = consentBootTarget(consent.isGranted(), Boolean(last));
-  if (destination === "screen-reading") await renderReading(last);
-  else show(destination);
+  const action = consentBootAction(consent.isGranted(), Boolean(last));
+  if (action.screen === "screen-reading") {
+    await renderReading(last);
+  } else if (action.startCapture) {
+    // Consented, no reading yet: open the camera rather than landing on a
+    // capture screen nothing will ever start (M1a boot fix).
+    try {
+      await runCapture();
+    } catch (err) {
+      console.error("qise: capture failed at boot", err);
+      $("gate-line").textContent = describeCameraError(err);
+      show("screen-capture");
+    }
+  } else {
+    show(action.screen);
+  }
 }
 
 boot().catch((err) => {

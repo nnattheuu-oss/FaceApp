@@ -104,9 +104,42 @@ export async function requestCameraRefocus(track, { settleMs = 450, wait = sleep
   }
 }
 
+/**
+ * The face model (bundle, WASM runtime or model file) did not load, or no
+ * delegate could run it. Distinct from every camera error on purpose: the
+ * camera opened and the permission is fine, so describeCameraError's
+ * permission advice is the wrong fix (M1a fix (d)).
+ */
+export class ModelLoadError extends Error {
+  constructor(cause) {
+    super("The face model did not load", { cause });
+    this.name = "ModelLoadError";
+  }
+}
+
+/**
+ * Run the landmarker build step and tag any failure as a ModelLoadError. A
+ * consent refusal passes through untouched: that is a gate doing its job,
+ * not a load failure, and it must keep its own type.
+ * @template T
+ * @param {()=>Promise<T>} step
+ * @returns {Promise<T>}
+ */
+export async function loadFaceModel(step) {
+  try {
+    return await step();
+  } catch (error) {
+    if (error?.name === "ConsentRequiredError" || error instanceof ModelLoadError) throw error;
+    throw new ModelLoadError(error);
+  }
+}
+
 /** Turn browser camera errors into a useful next action rather than a dead preview. */
 export function describeCameraError(error) {
   const name = error?.name || "";
+  if (name === "ModelLoadError") {
+    return "The face reader did not load. Your camera is fine. Check your connection, then tap Restart camera.";
+  }
   if (name === "NotAllowedError" || name === "PermissionDeniedError") {
     return "Camera access is off. Allow it in this site's settings, or choose a selfie below.";
   }
@@ -123,6 +156,14 @@ export function describeCameraError(error) {
     return "The camera needs a secure page. Open the HTTPS link, or choose a selfie below.";
   }
   return "The camera did not open. Retry, check this site's camera permission, or choose a selfie below.";
+}
+
+/** The selfie path needs the same model; a load failure is not a bad photo. */
+export function describeSelfieError(error) {
+  if (error?.name === "ModelLoadError") {
+    return "The face reader did not load. Your photo is fine. Check your connection, then choose it again.";
+  }
+  return "That selfie could not be read. Choose another original photo.";
 }
 
 /**
@@ -576,6 +617,7 @@ export function releaseCapture(scratch) {
   const released = {
     images: 0, landmarkArrays: 0, canvasCleared: false, tracksStopped: 0,
     landmarkerClosed: false, previewCleared: false, wakeLockReleased: false,
+    lifecycleDisposed: false,
   };
   if (!scratch) return released;
 
@@ -616,6 +658,12 @@ export function releaseCapture(scratch) {
   // Deliberately NOT awaited: this function is synchronous by contract, and
   // release() resolves rather than rejecting (it logs its own failures), so
   // there is no rejection to strand.
+  // The lifecycle watcher (qise/capture-lifecycle.js) goes with the capture
+  // it watches, on every way out, so a dead capture never restarts itself.
+  if (scratch.lifecycle && typeof scratch.lifecycle.dispose === "function") {
+    scratch.lifecycle.dispose();
+    released.lifecycleDisposed = true;
+  }
   if (scratch.wakeLock && typeof scratch.wakeLock.release === "function") {
     scratch.wakeLock.release();
     released.wakeLockReleased = true;
@@ -628,5 +676,6 @@ export function releaseCapture(scratch) {
   scratch.landmarker = null;
   scratch.video = null;
   scratch.wakeLock = null;
+  scratch.lifecycle = null;
   return released;
 }
