@@ -4,7 +4,9 @@
 
 Mien Shiang is a scanner-first, on-device entertainment and self-discovery experience inspired by classical Chinese face-reading traditions. It turns eligible facial geometry and personal colour-baseline signals into reflective, non-diagnostic readings. It does not identify a person or determine health, attractiveness, destiny, protected traits or fixed character.
 
-The live product should run its capture, measurement, eligibility and interpretation logic on the customer's device. Raw camera frames are processed in volatile memory, are not uploaded and are not persisted. Only explicitly allow-listed derived records may be stored locally.
+The live product should run its capture, measurement, eligibility and interpretation logic on the customer's device. Raw camera frames — and every frame consumed by the measurement path (`regionStats()`, `computeReadingMetrics()`, and everything CLAUDE.md's item 16 boundary governs) — are processed in volatile memory, are not uploaded and are not persisted. Only explicitly allow-listed derived records may be stored locally.
+
+**Amended 9 September 2026 (`DR-2026-09-09-CARDS-1-2-DAILY-PORTRAIT-CHARTER`, Decision Card 1, Option A):** one additional, narrowly-scoped exception exists. A Daily Portrait **timeline display frame** — the aligned, cropped, orientation-corrected artefact specified in `docs/DAILY_PORTRAIT_ARCHITECTURE.md`, derived from a capture but never the same buffer the measurement path reads — may be persisted locally as an allow-listed derived record, once implemented and gated on consent per that document. This is the only new persistence this amendment authorises. The guarantee in the paragraph above is otherwise unchanged: no measurement-path frame is affected by this exception, and `docs/DAILY_PORTRAIT_ARCHITECTURE.md`'s own separation rule exists precisely so this stays true.
 
 ## Experience standard
 
@@ -66,7 +68,7 @@ interpretation. **One of them has never been able to run.**
   model contains no auricle geometry: no helix, antihelix, tragus, concha or
   lobule vertex, and only ten of its 468 vertices sit posterior to z = −1.5. The
   gate cannot be evaluated from a front-facing capture and never could.
-  `src/engine.js:227` already recorded `diagonal_crease: "needs an ear detector;
+  `src/engine.js` (`UNAVAILABLE.diagonal_crease`) already recorded `diagonal_crease: "needs an ear detector;
   the face mesh has no earlobe points"`. Reinstating it requires a separate ear
   detector, a separate capture pose, its own consent and its own failure mode —
   a project, not a fix.

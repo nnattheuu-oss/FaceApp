@@ -11,6 +11,7 @@ import { sealModel, sealSvg } from "./seal.js";
 import { passageFor } from "../../qise/passages.js";
 import { isLowConfidence } from "../../qise/baseline.js";
 import { compositionOf, COMPOSITION_COLOURS } from "../../qise/composition.js";
+import { PALACE_INTERPRETATIONS } from "../../reading/palace-interpretations.js";
 
 export const COMPOSITION_LABELS = Object.freeze({
   chi: Object.freeze({ name: "chi", note: "warm note" }),
@@ -248,10 +249,21 @@ export function integratedReadingModel(reading) {
     supported: palace.supported === true,
     notMeasuredNote: palace.notMeasuredNote || null,
     heritageStatus: palace.heritageStatus || palaceSource?.heritageStatus || null,
-    sourceReviewNote: palace.sourceReviewNote || palaceSource?.sourceReviewNote || null,
+    // structuralNote (a per-palace explanation of why this one's interpretation is
+    // withheld, e.g. a source disagreement) reuses the same rendered slot as the
+    // older, more generic sourceReviewNote so app.js needs no separate handling.
+    sourceReviewNote: palace.structuralNote || palace.sourceReviewNote || palaceSource?.sourceReviewNote || null,
+    translationNote: palace.translationNote || null,
     reading: (palace.heritageStatus || palaceSource?.heritageStatus) === "RUNTIME_PROSE"
       ? palace.reading || null
       : null,
+    // Stored readings carry no interpretation (it is corpus, not measurement),
+    // so it is looked up by key at render time. A reading made before L-05
+    // therefore gains the interpretation too, which is correct: it was never
+    // derived from the face.
+    interpretation: (palace.heritageStatus || palaceSource?.heritageStatus) === "RUNTIME_PROSE"
+      ? null
+      : PALACE_INTERPRETATIONS[palace.key] ?? null,
   }));
   const measuredPalaces = allPalaces.filter((palace) => palace.measured);
   const harmonyComponents = (harmony?.components || []).map((component) => ({

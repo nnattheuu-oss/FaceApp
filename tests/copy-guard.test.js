@@ -24,7 +24,7 @@ import { RULES_B, MODULE_B_DISCLAIMER } from "../src/rules-b.js";
 import { ELEMENTS, SHAPE_TO_ELEMENT } from "../src/reading/five-elements.js";
 import { COURTS, BALANCED_READING, SOURCES_DIFFER as COURTS_DIFFER }
   from "../src/reading/three-courts.js";
-import { PALACES, PALACE_SOURCE_REVIEW_NOTE, SOURCES_DIFFER as PALACE_DIFFER }
+import { PALACES, SOURCES_DIFFER as PALACE_DIFFER }
   from "../src/reading/twelve-palaces.js";
 import { BANDS, SOURCES_DIFFER as QISE_DIFFER } from "../src/reading/qi-se.js";
 import { SCIENCE_POINTS, SCIENCE_INTRO } from "../src/reading/science.js";
@@ -33,6 +33,8 @@ import { SCIENCE_POINTS, SCIENCE_INTRO } from "../src/reading/science.js";
 import { NOT_READ_LABEL, NOTHING_READ, EMPHASIS_LEAD } from "../src/reading/summary.js";
 import { PALACE_SCOPE_NOTE } from "../src/readingview.js";
 import { INSIGHTS_COPY } from "../src/utils/insights.js";
+import { PALACE_INTERPRETATIONS, INTERPRETATION_LABEL, PALACE_BASIS_NOTE }
+  from "../src/reading/palace-interpretations.js";
 import { HARMONY_LEAD, HARMONY_NOT_MEASURED, SOURCES_DIFFER as HARMONY_SOURCES_DIFFER }
   from "../src/reading/harmony.js";
 
@@ -42,7 +44,7 @@ const MODULE_A_COPY = {
   RULES_A, ZONE_READINGS,
   ELEMENTS, SHAPE_TO_ELEMENT,
   COURTS, BALANCED_READING, COURTS_DIFFER,
-  PALACES, PALACE_SOURCE_REVIEW_NOTE, PALACE_DIFFER,
+  PALACES, PALACE_DIFFER,
   BANDS, QISE_DIFFER,
   // The reading receipt and the palace scope note are user-facing Module A
   // copy too. Registered here so they are scanned rather than trusted —
@@ -55,6 +57,10 @@ const MODULE_A_COPY = {
   // check below -- which only walks src/reading/ -- cannot catch it going
   // unregistered. Listed explicitly for that reason.
   INSIGHTS: INSIGHTS_COPY,
+  // SpiritMaxx's own Twelve Palaces interpretations (L-05). App-authored, so
+  // they carry no tradition marker by design, and are therefore held to the
+  // assertive-phrasing and negative-verdict guards WITHOUT the marker escape.
+  PALACE_INTERPRETATIONS: { PALACE_INTERPRETATIONS, INTERPRETATION_LABEL, PALACE_BASIS_NOTE },
   // The beta scanner's copy. It ships from /beta/ to the same people, so it is
   // scanned by the same guard: an unregistered surface ships unread, whichever
   // URL it is served from.

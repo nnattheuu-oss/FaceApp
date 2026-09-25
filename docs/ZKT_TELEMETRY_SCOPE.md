@@ -1,3 +1,5 @@
+> **Proposed supersession (25 Sep 2026): DR-2026-09-25-ANALYTICS-CARD-9.** Owner approval is pending. If approved, this proposal is superseded: there is no first-party telemetry at M1, the funnel comes from Play Console and RevenueCat, and device performance is covered by the release-gate device matrix (`docs/MONETISATION_AUDIT_2026-09.md` D4 §6).
+
 # Zero-Knowledge Telemetry (ZKT) — scope document, NOT a decision
 
 **Status: proposal only. Nothing in this document is implemented. No code
@@ -11,12 +13,13 @@ three lighting-consistency engine changes on this branch.
 The lighting-consistency review (this branch) established that the app has
 no way to learn how it actually behaves on real customer hardware — no
 device is more real than the synthetic fixtures in `tests/` and
-`scripts/engine-bench.mjs`. Per the Phase 0 audit already on this repo
-(`docs/PHASE_0_BLOCKER_REPORT.md`), there is currently no signed Android
-candidate, no iOS target, and no store listing either — so even if ZKT ships
-today, there is no installed base to generate data from until distribution
-catches up. This is worth building for when that changes, not for an
-immediate result.
+`scripts/engine-bench.mjs`. Per the current store-readiness record
+(`docs/STORE_RELEASE_GATES.md` — corrected 9 September 2026 from a citation
+to `docs/PHASE_0_BLOCKER_REPORT.md`, a file that does not exist in this
+repository), there is currently no signed Android candidate, no iOS target,
+and no store listing either — so even if ZKT ships today, there is no
+installed base to generate data from until distribution catches up. This is
+worth building for when that changes, not for an immediate result.
 
 ## What this is not
 

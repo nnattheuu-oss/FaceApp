@@ -2,6 +2,8 @@
 
 COST CONTROL: Claude is the repository's research/review specialist, not the default implementation worker. Before beginning work, classify the task. If the specification is already settled and the remaining work is primarily mechanical implementation, testing, repository administration, or repetitive toil, STOP and hand execution to Gemini 2.5 Flash.
 
+**Owner-directed exception (DR-2026-09-25-M0-CONSOLIDATION).** When the product owner explicitly directs a Claude session to execute a milestone end to end (for example the 25 September 2026 monetisation programme: M0, D1–D6, M1a/b/c), Claude executes it and does not hand off. The hand-off rule above still governs every task the owner has not directed in that way. The context-hygiene rules below apply either way.
+
 ## AI Context / Cost Control — Mandatory
 
 See `docs/AI_CONTEXT_BUDGET.md` for full policy details.
@@ -42,7 +44,19 @@ Rules:
    - investigation where conclusions cannot yet be checkpointed.
    Even then, checkpoint conclusions between phases and clear context when the research question materially changes.
 
-Context for working on this repo. Read before changing anything in `src/`.\n\n## Canonical operating documents\n\nRead `AGENTS.md`, `docs/PROJECT_CHARTER.md`, `docs/DECISION_REGISTER.md`,\n`docs/AGENT_OPERATING_MODEL.md`, `docs/INTERPRETATION_SYSTEM.md` and the\nrelevant brief under `docs/agents/`. These files distinguish implemented facts\nfrom approved direction and unresolved proposals; chat prompts do not override them.
+Context for working on this repo. Read before changing anything in `src/`.
+
+## Canonical operating documents
+
+Read `AGENTS.md`, `docs/PROJECT_CHARTER.md`, `docs/DECISION_REGISTER.md`,
+`docs/AGENT_OPERATING_MODEL.md`, `docs/INTERPRETATION_SYSTEM.md` and the
+relevant brief under `docs/agents/`. These files distinguish implemented facts
+from approved direction and unresolved proposals; chat prompts do not override them.
+
+*(Corrected 9 September 2026: this paragraph previously contained literal
+`\n` escape sequences instead of real line breaks — one unbroken line that
+rendered as an unreadable run-on in any plain markdown viewer, confirmed with
+`cat -A`. The content is unchanged; only the formatting is fixed.)*
 
 ## What this is
 
@@ -62,7 +76,9 @@ change the product's regulatory status, not just its tone.
 npm start        # dev server on http://localhost:5173 (honours PORT)
 npm test         # node:test suite
 npm run build    # dist/ — copy of src/, Module B stubbed in the entertainment flavour
-npm run lint:bundle   # compliance guards, run against dist/ not src/
+npm run lint:bundle   # compliance guards, run against dist/ not src/ (incl. the L-06 content gate)
+npm run test:falsify  # L-10: break each billing rule on purpose; every mutation must be caught
+node scripts/check-android.mjs <bubblewrap-dir>  # L-11: targetSdk >= 36, Play Billing on
 node scripts/qise-bakeoff.mjs --self-test   # Phase 5b decision table
 node scripts/engine-bench.mjs out.txt       # engine timings + measurement fingerprint
 ```
@@ -77,11 +93,11 @@ stubs when the flag is off.
 
 `package-lock.json` pins the declared dependencies for reproducible `npm ci` installs.
 
-1394 across 97 files, measured 6 September 2026 by running `npm test` directly rather than trusting
+1414 across 99 files, measured 23 September 2026 by running `npm test` directly rather than trusting
 this line — the exact commands and sub-counts age quickly as the suite grows, so verify with the
 runner rather than updating this sentence again.
 
-**All 1394 pass.** The long-standing `copy-guard` failure on
+**All 1414 pass.** The long-standing `copy-guard` failure on
 `TCM-202-DAMP-HEAT.recommend[1]` is resolved — that line moved to Module B in
 the Phase 2 split (see item 19). If a test fails, it is a real defect.
 
@@ -104,10 +120,21 @@ without a phone live in `docs/QISE_NOTES.md`. Read that before touching it.
 
 ## Architecture
 
+**Which app is which (refreshed in M0, 25 Sep 2026).** The product people use
+is the Qi Se tracker: `src/qise.html` + `src/ui/qise/app.js`. `src/index.html`
+redirects there unless the URL carries `?classic`; the classic flow
+(`index.html?classic` → `ui.js` → `analysis.js`, including Module B, the
+science screen and the old share gate) is an escape hatch that the store
+artefact excludes (proposed DR-2026-09-25-STORE-ARTEFACT-SCOPE). `src/beta/` is
+a research bench. Commerce lives in `src/billing/` + `src/ui/qise/paywall.js`
+(DR-2026-09-23-LAUNCH-V1; entitlement provider moves to RevenueCat under
+DR-2026-09-25-DUAL-STORE-REVENUECAT). The monetisation programme and its
+milestones are in `docs/MONETISATION_AUDIT_2026-09.md`.
+
 ```
 src/
-  index.html    UI + all styles (single file, no framework)
-  ui.js         screen wiring, overlay rendering, consent gate
+  index.html    CLASSIC UI + styles; redirects to qise.html unless ?classic
+  ui.js         CLASSIC screen wiring, overlay rendering, consent gate
   analysis.js   MediaPipe landmarking, ROI hull masking, orchestration
   flags.js      build flavour: does Module B ship? (ASCII-only, see item 17)
   zones.js      ROI geometry — measurement config, owned by neither module
@@ -138,7 +165,11 @@ src/
     insights.js           MODULE A shape narrative; teaser free, report gated
     textureAnalyzer.js    oriented GLCM, robust statistics  ← pure, same
   rules.js      facial zone definitions + forward-chaining rule engine
-  sw.js         offline cache (app shell + WASM + model)
+  sw.js         offline cache (app shell; vendored WASM + model cached on first fetch)
+  billing/      catalogue.js entitlements.js offers.js purchase.js — the entitlement
+                model; provider layer is Play Digital Goods today, RevenueCat from M1c
+  heritage/     source registry, evidence, resolver, composition (fail-closed)
+  beta/         research bench surface; excluded from the store artefact
   manifest.webmanifest   PWA metadata; must be served as application/manifest+json
   icon-192.png           install icon (purpose: any)
   icon-512.png           install icon (purpose: any)
@@ -158,11 +189,19 @@ src/
     store.js      IndexedDB; toRecord() is a pure allow-list (item 39)
     passages.js   attributed passage corpus, composed from three keyed parts
     patterns.js   frequency-only statements, n >= 5, n always shown
+    frame-scheduler.js  distinct decoded frames only (rVFC, rAF fallback)
+    capture-runtime.js  screen-assist guard, refocus, stall tracking
+    reading-*.js reflection*.js  the Reflection Engine (public default: see
+                  DR-2026-08-17-REFLECTION-ENGINE-INTERNAL-DEFAULT)
   ui/qise/      the tracker's view layer — pure models, string renderers
     palette.js    five colours + Su Wen similes; emits the CSS custom properties
     seal.js       the compass as a carved seal, seeded from the timestamp
     screens.js    reading-screen order, gauges, courts strip, sparkline
     app.js        DOM wiring ONLY; MediaPipe is a dynamic import (item 41)
+    paywall.js    hard paywall: paid content removed from the model, not blurred
+    share.js      Qi Se share cards (no face photo, no raw measurements)
+  reading/palace-interpretations.js  L-05 app-authored text, used only where
+                  the project's sources dispute a palace (Wealth, Property)
 scripts/
   serve.js      local dev server ONLY — never deployed
   run-tests.js  test discovery; exits 1 on zero files found
@@ -205,8 +244,9 @@ photo → canvas → un-mirror → Shades-of-Gray white balance (WHOLE FRAME, ON
       → observation facts → forward-chaining rules → referrals + advice
 ```
 
-MediaPipe (`@mediapipe/tasks-vision@0.10.18`) and the 3.76 MB face model load
-from CDN and are cached by the service worker for offline use.
+MediaPipe (`@mediapipe/tasks-vision@0.10.18`) and the face model are
+**vendored same-origin** by `scripts/build.js` (hash-pinned) and cached by the
+service worker on first fetch. Nothing loads from a CDN.
 
 ---
 
@@ -510,7 +550,7 @@ cache, which does not contain the new module.
 release that works perfectly on a fresh install.
 **Cause:** new entry in `SHELL`, unchanged `CACHE` name.
 
-Currently `mienshiang-v25` (bumped when frame-scheduler.js entered ui/qise/app.js's static import graph).
+Currently `mienshiang-v26` (bumped when the Play Billing modules, `ui/qise/paywall.js` and `reading/palace-interpretations.js` entered the static import graphs of `ui.js` and `ui/qise/app.js` — DR-2026-09-23-LAUNCH-V1).
 
 **The version is coupled to `index.html`, which is easy to miss.** The entry
 redirect is `location.replace("./qise.html?v=<n>")`, and `<n>` must equal the
@@ -822,39 +862,40 @@ inside an expression. `treat` was caught by the copy guard while writing this
 file, in its ordinary English sense, exactly as item 19 warns; it is now
 "regard".
 
-### 34. The unlock gate is soft, and saying so is the feature
+### 34. Paid access is whatever Google Play says NOW, and nothing on the device remembers it
 
-`shareGate.js` has three unlock states and no backend. Every one lives in
-localStorage, so anyone with devtools can grant themselves any of them, and the
-redeem URL can be shared by hand. **Nothing there is an entitlement; it is a
-courtesy latch.**
+**Superseded design, kept for its reasoning.** This item used to describe `shareGate.js`: a
+soft, localStorage "courtesy latch" with share-to-unlock, a weekly window and a redeem URL.
+Launch v1 (`DR-2026-09-23-LAUNCH-V1`, L-03/L-04) removed all of it. A latch was defensible
+while nothing was sold; once money changes hands, a flag anyone can set from devtools is a
+fake entitlement (`docs/agents/commerce-entitlements.md`).
 
-That is not a defect awaiting a fix — it follows directly from no-account,
-no-server, nothing-leaves-the-device. The only real fix is a server that
-verifies a receipt, which means an account, which is what the privacy posture
-exists to avoid. What follows:
+What replaced it, in `src/billing/`:
 
-- Nothing goes behind the gate that would be harmful to leak.
-- **Module B is never behind it** (`MODULE_B_IS_NEVER_MONETISED`). Safety
-  content is not paid content.
-- Do not add obfuscation that makes it look authoritative. A latch that
-  pretends to be a lock invites someone downstream to trust it.
+- **Entitlement is re-read from Play's `listPurchases()` on every render.** No flag, no
+  timestamp, no "last known good" in storage. A refund, revocation or lapsed subscription
+  locks the reading on the next open, because there is nothing to go stale.
+- **`unsupported` (no Digital Goods API: a plain browser) and `unverifiable` (the API exists,
+  Play did not answer) stay separate.** Both grant nothing. Only the second offers a retry, and
+  neither is ever reported as "not purchased".
+- **The payment response is not the entitlement.** `purchase()` grants only when a fresh
+  `listPurchases()` lists the item; otherwise it reports `pending`.
+- **`purchase()` refuses before the sheet opens while `ACKNOWLEDGEMENT_ROUTE` is null.** Play
+  refunds unacknowledged purchases after three days, and the Digital Goods API cannot
+  acknowledge without a backend (audit finding B-1). Taking money that is handed back 72 hours
+  later is worse than a paywall that says purchases are not open.
+- **The paywall is hard.** `gateIntegratedModel()` removes paid fields from the view model
+  before markup exists, and the classic view no longer renders paid sections under a blur.
+  "View source" was the old unlock.
+- **Module B is never paid** (`MODULE_B_IS_NEVER_MONETISED`). `hasFeature()` treats anything
+  not in `PAID_FEATURES` as free, so a safety surface cannot become gated by being forgotten.
 
-Two failure directions were chosen deliberately: a subscription whose expiry is
-missing or unparseable **fails closed**, and expiry **clears** the stored state
-rather than being recomputed each read — otherwise a lapsed week reopens by
-moving a clock the user controls.
-
-**Pinned by:** `a weekly window is open inside its term and shut after it`
-(asserts the exact boundary instant), `a subscription with a missing or corrupt
-expiry fails CLOSED`, and `expiry clears the stored state rather than leaving it
-to be re-read`.
-
-The checkout host is allowlisted with a pattern anchored at both ends whose path
-segment cannot contain `?` or `#`. A checkout URL is the one place it would feel
-natural to append context, and any such value would be face-derived data handed
-to a third party in a URL the app invites the user to open. The regex makes that
-unrepresentable rather than merely discouraged.
+**Symptom:** a reading that stays unlocked after a refund; paid prose findable in the DOM of a
+locked page; a purchase that "succeeds" and vanishes three days later.
+**Pinned by:** `tests/billing.test.js`, and by `scripts/billing-falsify.mjs`
+(`npm run test:falsify`). The script breaks each of these properties on purpose and requires
+the named test to go red. L-10 makes this falsification-first standard mandatory for billing.
+If you add a billing rule, add its mutation.
 
 ### 35. The share card is the most public surface, and it drops rather than trims
 
@@ -888,27 +929,12 @@ directions: as a literal it fails with
 and injected from the marked template all four guards pass. Same arrangement as
 the summary caveat (item 24) — one wording, two consumers.
 
-### 36. The dev panel expires the model that ships
+### 36. The dev panel hands out nothing
 
-`forceExpireSubscription()` moves the stored **expiry** into the past. The brief
-specified winding a `subscriptionStart` back by eight days, which describes a
-different model from the one in `shareGate.js`: this stores an absolute expiry,
-not a start plus a duration.
-
-The difference is the point. With a start time, "expired" is recomputed on every
-read from a clock the device owns, so a lapsed week reopens the moment the
-system date moves — which is why item 34 stores the expiry and clears it on
-lapse. A test harness that fakes a start time would be exercising a model the
-app does not have.
-
-`console.warn` on open is deliberate and survives minification: the panel hands
-out every unlock state for free, so the one thing that must not happen is it
-shipping unnoticed.
-
-**Pinned by:** `dev: force-expire lapses a live subscription and only a live
-one` and `dev: the three grants are mutually exclusive, last one wins` — the
-second guards a stale expiry following the state that replaced it, which would
-give a lifetime unlock someone else's deadline.
+**Superseded.** The 7-tap dev panel used to grant every unlock state and force-expire a weekly
+subscription. With real purchases, that panel would have shipped a free unlock to every user.
+It now only resets consent on the device. Test purchases go through Play's licence testers,
+never through a local grant (`DR-2026-09-23-LAUNCH-V1`).
 
 ### 37. A rank test is degenerate on a flat region
 
@@ -1941,6 +1967,60 @@ observations — erythema via `sev(dEi, …)` and pallor via `sev(-dEi, …)`. T
 low-confidence regime suppresses both, so removing that single constant removes
 both observations together. Four-and-three is the right split; it is one
 constant carrying two suppressed observations, not one carrying one.
+
+#### Calibration validation plan (merged from `CALIBRATION_TODO.md`, 9 September 2026)
+
+`calculateAdaptiveScale` in `src/utils/calibrationEngine.js` computes a
+per-image scale from the whole-frame 90th-percentile Hessian structureness:
+`scale = 2 * (p90 / 0.06)`. The constant `0.06` was measured on **synthetic**
+flat-skin patches using the 3-point Laplacian in `ridgeResponse()` — genuine
+furrows reached ~2.5 on the same patches, sensor noise sits around 0.06.
+**This has not been validated on real phone photos.** The highest-value
+single improvement: collect ~20 real phone photos across varied skin tones
+(Fitzpatrick I–VI), mixed ages, and mixed lighting (indoor ambient, outdoor
+daylight, flash); label each forehead/glabella zone smooth or wrinkled by
+visual inspection; run `ridgeResponse()` with the current static
+`RIDGE_STRUCTURE_SCALE = 1.0` and with the adaptive output; compare the
+resulting `ridgeDelta` distributions between the two groups; choose the
+constant that maximises separation per skin-tone stratum. Target: at least
+0.5 standardised mean difference per stratum before the adaptive scale is
+considered validated.
+
+`ZONE_FULL_SCALE`'s per-zone values are based on known anatomical wrinkle
+depth differences but have not been fitted to labelled data — forehead
+`0.08` (deep horizontal expression lines), glabella `0.09` (deepest
+inter-brow furrows), periorbital `0.04` (fine crow's-feet, thin skin),
+nasolabial `0.05` (moderate fold depth), cheeks `0.06` (baseline, matches the
+original constant), chin `0.05` (moderate). These need calibrating against
+the same labelled photo set. `ITA_CONFIDENCE` is derived from Lee et al.
+2026, Wilkes et al., and the Chardon 1991 ITA banding — literature-grounded,
+not fitted to a validation set for this app's specific configuration. The
+±30° angular tolerance in `ridgeResponse` (item 32's taper) was chosen to
+balance sensitivity against specificity; if too many false positives appear
+on smooth cheeks under real-photo testing, tighten toward 20°.
+
+Priority order once real photos exist: collect the labelled set (≥20) → fit
+`RIDGE_STRUCTURE_SCALE` per skin-tone stratum → fit `ZONE_FULL_SCALE` from
+labelled zones → validate `ITA_CONFIDENCE` asymmetry against erythema ground
+truth → consider isotonic calibration of severity → confidence once
+sufficient labelled data exists (target n ≥ 100 per stratum).
+
+**`AXIS_MAD_FLOOR.ming` — a unit mismatch, `needsVerification: true`.**
+`src/qise/baseline.js` sets `ming: 0.15` and `run: 0.15`, copied from the
+CIELAB axes, with a comment warning the units differ. `ming` is
+`L*(P90) / L*(P50)` (`src/qise/metrics.js`, `lumRatioP90P50`) — dimensionless,
+typically a little above 1; the floor is `max(2 * MAD, AXIS_MAD_FLOOR)`, so
+whenever the personal MAD is small the constant binds, and `courseKey`
+(`src/qise/passages.js`) thresholds at 1 — meaning lustre only leaves
+`"level"` once the ratio moves by 0.15 or more, a very large day-to-day swing
+for that quantity. `run` is `C * (1 + 0.045 * C)`
+(`src/qise/metrics.js`/`color.js`), roughly 25 at C ≈ 15 — its own MAD
+dominates the 0.15 floor, so it self-scales correctly and needs no change.
+**Prediction if unaddressed:** `ming` reads `"level"` nearly always and
+`courseKey` collapses toward `moistureLed`/`level`, i.e. `run` alone drives
+the course. **Measurement that would settle it:** the personal MAD of `ming`
+across a real multi-day capture series, per capture class. Until that exists
+there is no basis for a value, so the constant is left untouched.
 
 ---
 

@@ -172,27 +172,25 @@ test("renderReadingGated locked=false produces the same structure as renderReadi
   assert.ok(!gated.includes("reading-gate-overlay"), "no overlay when unlocked");
 });
 
-test("renderReadingGated locked=true shows Five Elements and hides the rest behind an overlay", () => {
+test("renderReadingGated locked=true keeps the L-03 free sections and offers the paywall", () => {
   const reading = fullReading();
   const html = renderReadingGated(reading, { locked: true, overlayHtml: "<p>GATE</p>" });
-  // Five Elements is OUTSIDE the gate-wrap — always visible.
-  const gateWrapStart = html.indexOf("reading-gate-wrap");
-  const fiveElemStart = html.indexOf("Five Elements");
-  assert.ok(fiveElemStart < gateWrapStart,
-    "Five Elements must appear before the gate wrapper");
-  // The overlay is present.
-  assert.ok(html.includes("reading-gate-overlay"), "overlay div present");
-  assert.ok(html.includes("GATE"), "overlay content injected");
-  // The blurred region is aria-hidden.
-  assert.ok(html.includes("aria-hidden=\"true\""), "blurred region is aria-hidden");
+  // Free in v1 (DR-2026-09-23-LAUNCH-V1, L-03): Three Sections and qi se.
+  assert.ok(html.includes("Three Sections"), "Three Sections is free");
+  assert.ok(html.includes("Qi se"), "the colour reading is free");
+  assert.ok(html.includes("GATE"), "the paywall panel is injected");
 });
 
-test("renderReadingGated locked=true still contains gated section text (for search / a11y)", () => {
+test("renderReadingGated locked=true does NOT put paid content in the DOM", () => {
+  // Replaces a test that pinned the opposite: the old frosted overlay kept the
+  // paid text in the page "for search / a11y", which made view-source the
+  // unlock. Under a hard paywall (L-03) locked content must be absent.
   const reading = fullReading();
   const html = renderReadingGated(reading, { locked: true, overlayHtml: "" });
-  // Content is in the DOM (aria-hidden blur layer) even when visually obscured.
-  assert.ok(html.includes("Three Sections") || html.includes("Twelve Palaces"),
-    "gated section text present in the DOM even when locked");
+  assert.ok(!html.includes("Five Elements"), "Five Elements is paid trait mapping");
+  assert.ok(!html.includes("Twelve Palaces"), "the Twelve Palaces are paid");
+  assert.ok(!html.includes(reading.fiveElements.reading), "the element prose never leaks");
+  assert.ok(!html.includes("aria-hidden=\"true\"><div"), "no hidden copy of the paid sections");
 });
 
 test("renderReadingGated with null reading returns empty string", () => {

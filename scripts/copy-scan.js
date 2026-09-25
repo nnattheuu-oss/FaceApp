@@ -257,6 +257,94 @@ export function findAssertive(strings) {
 }
 
 /**
+ * The v1 content gate (owner decision L-06, DR-2026-09-23-LAUNCH-V1).
+ *
+ * L-06 makes the lexicon lint the ONLY content gate for v1: a reading string
+ * ships if it carries no (1) health/diagnostic vocabulary -- BLOCKLIST and
+ * DISEASE_TERMS above -- and none of the three claim families below.
+ *
+ * ── CLAIM-SHAPED, NOT WORD-SHAPED ──────────────────────────────────────────
+ * L-06 names "will", "fortune", "predict", "measured" and "height". Banned as
+ * bare words they would reject the product's most honest sentences: "Nothing
+ * was measured to bring to this" (an abstention -- invariant I5 REQUIRES it),
+ * "Fortune Palace" (the tradition's own name), "careful, measured responses"
+ * (an adjective), "None of that makes them predictive" (a disclaimer). A gate
+ * that forces those out makes the copy LESS truthful, which is the opposite of
+ * what the gate is for. So each rule matches the CLAIM -- the word in the
+ * construction that asserts something about the reader -- and every rule
+ * carries a positive and a negative control in tests/launch-content-gate.
+ *
+ * ── NO TRADITION ESCAPE ────────────────────────────────────────────────────
+ * findAssertive() above lets a tradition-attributed string say "you are". This
+ * gate does not: "In Mian Xiang, you will prosper" is still a prediction about
+ * the reader, and under L-05 app-authored copy is not traditional anyway.
+ */
+export const LAUNCH_CONTENT_RULES = Object.freeze({
+  prediction: [
+    /\byou(?: will|'ll|\u2019ll| shall)\b/i,
+    /\byour (?:future|fate|destiny|fortunes?|luck)\b/i,
+    /\bdestin(?:ed|y)\b/i,
+    /\bfated\b/i,
+    /\b(?:predicts?|foretells?|forecasts?|portends?)\s+(?:your|you|that you|a|an|the)\b/i,
+    /\bguarantee[sd]?\b/i,
+    /\b(?:good|great|bad|ill)\s+(?:fortune|luck)\b/i,
+    /\blucky\b/i,
+    /\bwill (?:bring|become|find|meet|marry|live|die|succeed|prosper|attract|lose|gain|face|suffer|enjoy|achieve|come to)\b/i,
+    /\b(?:wealth|riches|success|love|romance|prosperity)\s+(?:awaits|is coming|lies ahead|is on its way)\b/i,
+  ],
+  belief: [
+    /\byou (?:believe|are (?:religious|spiritual|devout|a believer|an atheist|agnostic))\b/i,
+    /\byour (?:faith|religion|beliefs?|religious\b|spiritual (?:beliefs?|path|nature|side))/i,
+    /\b(?:religious|spiritual) (?:person|type|nature|temperament)\b/i,
+  ],
+  measurement: [
+    /\bscientific(?:ally)?\s+(?:proven|validated|accurate|measured|shown|confirmed|precise)\b/i,
+    /\b(?:science|research|studies)\s+(?:shows?|proves?|confirms?)\b/i,
+    /\bclinically\b/i,
+    /\bproven\b/i,
+    /\bmeasured\s+(?:your\s+|the\s+)?(?:[a-z]+\s+)?(?:bones?|skull|depth|height|projection|prominence)\b/i,
+    /\b(?:bone|skull) structure\b/i,
+    /\b(?:your|the|a|this)\s+(?:nose|forehead|chin|cheekbones?|brows?|jaw)(?:'s|\u2019s)?\s+(?:height|depth|projection|prominence)\b/i,
+    /\b(?:high|low|prominent|projecting|protruding|jutting|deep-set|sunken|raised)\s+(?:cheekbones?|nose bridge|nose|brow ridge|brows?|forehead|chin|jaw(?:line)?)\b/i,
+    /\bmeasur(?:es|ed|ing)\s+(?:your|the)\s+(?:character|personality|spirit|qi|destiny|energy|soul)\b/i,
+  ],
+});
+
+/** Strings violating the L-06 claim families. */
+export function findLaunchContentViolations(strings) {
+  const hits = [];
+  for (const s of strings) {
+    for (const [family, rules] of Object.entries(LAUNCH_CONTENT_RULES)) {
+      for (const r of rules) {
+        const m = s.match(r);
+        if (m) hits.push({ family, match: m[0], text: s });
+      }
+    }
+  }
+  return hits;
+}
+
+/**
+ * The reading surfaces L-06 governs, as paths relative to src/ (and so also
+ * to dist/, which is a copy). A reading string lives in one of these files.
+ * The science screen, the consent gate and the legal pages are NOT readings:
+ * they must be able to say "research shows" and "we do not predict your
+ * future", and they have their own guards.
+ */
+export const READING_SURFACE_FILES = Object.freeze([
+  "rules-a.js", "readingview.js", "sharecard.js",
+  "reading/index.js", "reading/five-elements.js", "reading/three-courts.js",
+  "reading/twelve-palaces.js", "reading/palace-interpretations.js",
+  "reading/qi-se.js", "reading/summary.js", "reading/harmony.js",
+  "reading/provenance.js", "utils/insights.js",
+  "qise/passages.js", "qise/reflection-corpus.js", "qise/reflection.js",
+  "qise/reading-tiers.js", "qise/heritage-connections.js", "qise/patterns.js",
+  "qise/integrated.js",
+  "ui/qise/screens.js", "ui/qise/share.js", "ui/qise/heritage-view.js",
+  "ui/qise/paywall.js",
+]);
+
+/**
  * Canary. A scanner that finds nothing because it is broken must fail loudly
  * rather than report clean — this repo has already shipped one false all-clear
  * from a regex that silently matched nothing.

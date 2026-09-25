@@ -126,16 +126,16 @@ test("the privacy policy covers every required disclosure", () => {
 });
 
 test("the privacy policy does not claim collection that does not happen", () => {
-  // Sentry and RevenueCat are not integrated. A policy asserting that crash
-  // reports and purchase data ARE collected would be an inaccurate legal
-  // disclosure, so both are described as not currently active.
+  // Sentry is not integrated, so crash reporting stays marked inactive. Paid
+  // features go through Google Play Billing (DR-2026-09-23-LAUNCH-V1, L-03);
+  // the policy must name Google, link its policy, and must not name a
+  // purchase processor the app does not use.
   const html = src("privacy.html");
   assert.match(html, /Not currently active/,
     "inactive integrations must be marked, not described as live collection");
-  const notYetBlocks = html.match(/class="notyet"/g) ?? [];
-  assert.ok(notYetBlocks.length >= 2,
-    "both crash reporting and purchases must be marked as not yet active");
-  assert.match(html, /RevenueCat privacy policy/, "RevenueCat's policy must be linked");
+  assert.match(html, /Google Play Billing/, "the real payment processor must be named");
+  assert.match(html, /https:\/\/policies\.google\.com\/privacy/, "Google's policy must be linked");
+  assert.doesNotMatch(html, /RevenueCat/, "RevenueCat is not used and must not be described");
 });
 
 test("the terms page is real prose and is marked as an unreviewed draft", () => {

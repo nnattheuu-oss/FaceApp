@@ -1,0 +1,26 @@
+{
+  "packageId": "REPLACE_WITH_PERMANENT_PACKAGE_ID",
+  "host": "REPLACE_WITH_HTTPS_ORIGIN_HOST",
+  "name": "Mien Shiang",
+  "launcherName": "Mien Shiang",
+  "display": "standalone",
+  "orientation": "any",
+  "themeColor": "#1f2933",
+  "navigationColor": "#1f2933",
+  "backgroundColor": "#1f2933",
+  "enableNotifications": false,
+  "startUrl": "/qise.html",
+  "iconUrl": "https://REPLACE_WITH_HTTPS_ORIGIN_HOST/icon-512.png",
+  "maskableIconUrl": "https://REPLACE_WITH_HTTPS_ORIGIN_HOST/icon-512-maskable.png",
+  "webManifestUrl": "https://REPLACE_WITH_HTTPS_ORIGIN_HOST/manifest.webmanifest",
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "signingKey": { "path": "REPLACE_OUTSIDE_GIT/upload-keystore.jks", "alias": "upload" },
+  "fallbackType": "customtabs",
+  "enableSiteSettingsShortcut": false,
+  "isChromeOSOnly": false,
+  "alphaDependencies": { "enabled": true },
+  "features": {
+    "playBilling": { "enabled": true }
+  }
+}

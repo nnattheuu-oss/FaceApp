@@ -41,57 +41,45 @@ function makeReading({ shape = "square", canon = 0.7, available = true } = {}) {
 
 // ------------------------------------------------------------------ tests ---
 
-test("the insights teaser renders on the free side of the gate", () => {
+// The shape narrative is part of the paid "full trait mapping" under the v1
+// hard paywall (DR-2026-09-23-LAUNCH-V1, L-03). These two tests replace ones
+// that pinned the earlier split, where the teaser was free and the report sat
+// in the page under a blur. Locked now means ABSENT.
+
+test("the insights teaser is paid under L-03, and absent while locked", () => {
   const reading = makeReading();
   const expected = generateInsights("square", 0.7).teaserLines;
-
   assert.ok(expected.length >= 2, "fixture assumption: there are teaser lines to find");
 
   const locked = renderReadingGated(reading, { locked: true });
-
-  // Present at all...
-  assert.match(locked, /class="insights-teaser"/,
-    "the teaser must render even when the reading is locked");
+  assert.doesNotMatch(locked, /class="insights-teaser"/);
   for (const line of expected) {
-    assert.ok(locked.includes(line), `teaser line missing from the locked render: ${line}`);
+    assert.ok(!locked.includes(line), `teaser line leaked into the locked render: ${line}`);
   }
 
-  // ...and on the FREE side, not inside the blurred container. The blurred
-  // half starts at reading-gate-wrap, so a teaser that appears only after it
-  // has been gated by accident — which is the failure this pins.
-  const gateStart = locked.indexOf('class="reading-gate-wrap"');
-  assert.ok(gateStart > -1, "fixture assumption: the locked render has a gate wrapper");
-  assert.ok(locked.indexOf('class="insights-teaser"') < gateStart,
-    "the teaser must sit BEFORE the gate wrapper, not inside it");
-
-  // Ungated render still carries it.
+  const unlocked = renderReadingGated(reading, { locked: false });
+  assert.match(unlocked, /class="insights-teaser"/);
+  for (const line of expected) {
+    assert.ok(unlocked.includes(line), `teaser line missing once unlocked: ${line}`);
+  }
   assert.match(renderReading(reading), /class="insights-teaser"/);
 });
 
-test("the insights full report is gated, and its prose never leaks while locked", () => {
+test("the insights full report is paid, and its prose is absent while locked", () => {
   const reading = makeReading();
   const report = generateInsights("square", 0.7).fullReport;
 
   const locked = renderReadingGated(reading, { locked: true });
   const unlocked = renderReadingGated(reading, { locked: false });
 
-  // Unlocked shows it.
   assert.match(unlocked, /class="insights-report"/);
   assert.ok(unlocked.includes(report.summary), "the unlocked report must carry its summary");
 
-  // Locked renders it only INSIDE the blurred container. The section exists in
-  // the markup (that is what makes the gate visible as a gate) but must not
-  // appear before the wrapper, where it would be plainly readable.
-  const gateStart = locked.indexOf('class="reading-gate-wrap"');
-  const reportAt = locked.indexOf('class="insights-report"');
-  assert.ok(reportAt > gateStart,
-    "the full report must render inside the gate wrapper, never above it");
-
-  // The strengths and tendencies are the substance being sold. Assert each one
-  // lands on the gated side rather than trusting the container.
-  for (const line of [...report.strengths, ...report.tendencies]) {
-    const at = locked.indexOf(line);
-    assert.ok(at > gateStart, `gated prose rendered above the gate: ${line}`);
+  // The strengths and tendencies are the substance being sold. Each is checked
+  // individually rather than trusting a container.
+  assert.doesNotMatch(locked, /class="insights-report"/);
+  for (const line of [report.summary, ...report.strengths, ...report.tendencies]) {
+    assert.ok(!locked.includes(line), `paid prose present in the locked render: ${line}`);
   }
 });
 

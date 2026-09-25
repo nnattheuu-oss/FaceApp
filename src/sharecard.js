@@ -72,8 +72,11 @@ export function buildShareModel(reading, caveatText, opts = {}) {
   return {
     wordmark: "MIEN SHIANG",
     mode: unlocked ? "unlocked" : "locked",
-    shapeLine: fe?.available ? `${titleCase(fe.shape)} — ${fe.name} Element` : null,
-    canon,
+    // Five Elements and the canon comparison are the paid "full trait
+    // mapping" under L-03. A locked card is shared publicly by someone who has
+    // not bought them, so neither may appear on it.
+    shapeLine: unlocked && fe?.available ? `${titleCase(fe.shape)} — ${fe.name} Element` : null,
+    canon: unlocked ? canon : null,
     headline: s.headline.map((x) => x.label),
     coverage: s.coverage,
     emphasis: s.emphasis,
@@ -90,7 +93,9 @@ export function buildShareModel(reading, caveatText, opts = {}) {
      * So these are complete sentences, taken whole. If one does not fit the
      * card it is DROPPED, not trimmed — see fitWhole() in the draw step. */
     readings: unlocked ? [fe?.reading, h?.components?.[0]?.reads].filter(Boolean) : [],
-    teaser: unlocked ? null : "Full TCM Report + Aesthetic Analysis",
+    // Was "Full TCM Report + Aesthetic Analysis": a health framing and an
+    // attractiveness framing, on the most public surface the product has.
+    teaser: unlocked ? null : "The full reading",
     cta: unlocked || !url ? null : `Scan your face → ${url}`,
     caveat: caveatText ?? "",
     /** Mirrors the summary: nothing read means nothing claimed. */

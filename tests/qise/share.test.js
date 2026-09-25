@@ -76,7 +76,26 @@ test("today's share card carries the joined structural reading without raw geome
     fiveElements: { available: true, hanzi: "土", name: "Earth", shape: "square" },
     twelvePalaces: { measuredCount: 5, supportedCount: 6 },
   };
-  const model = shareCardModel([reading(9, "chi", { integrated })], "today");
+  const entitlement = { features: ["full-trait-mapping", "twelve-palaces"] };
+  const model = shareCardModel([reading(9, "chi", { integrated })], "today", { entitlement });
   assert.equal(model.structureLine, "Earth structure · square geometry · 5/6 supported palaces read");
   assert.doesNotMatch(JSON.stringify(model), /landmark|coordinate|embedding/i);
+});
+
+test("without a purchase the share card carries no structural line (L-03)", () => {
+  // The Five Elements frame is paid. The default is no entitlement, so a
+  // caller that forgets to pass one shares the free card, never the paid one.
+  const integrated = {
+    fiveElements: { available: true, hanzi: "土", name: "Earth", shape: "square" },
+    twelvePalaces: { measuredCount: 5, supportedCount: 6 },
+  };
+  const history = [reading(9, "chi", { integrated })];
+  assert.equal(shareCardModel(history, "today").structureLine, null);
+  assert.equal(shareCardModel(history, "today", { entitlement: { features: [] } }).structureLine, null);
+  assert.doesNotMatch(JSON.stringify(shareCardModel(history, "today")), /Earth/);
+});
+
+test("every share card carries the L-05 interpretation label", () => {
+  const model = shareCardModel([reading(9, "chi")], "today");
+  assert.equal(model.label, "SpiritMaxx interpretation, inspired by classical Mien Shiang.");
 });

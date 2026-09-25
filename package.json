@@ -7,6 +7,7 @@
   "scripts": {
     "start": "npm run build && node scripts/serve.js --dist",
     "test": "node scripts/run-tests.js",
+    "test:falsify": "node scripts/billing-falsify.mjs",
     "test:browser": "playwright test --grep-invert @benchmark",
     "benchmark:low-end": "playwright test --grep @benchmark",
     "audit:release": "node scripts/check-release.js",

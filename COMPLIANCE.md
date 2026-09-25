@@ -250,3 +250,22 @@ npm test             # includes the copy, report and about guards
 
 `npm run lint:bundle` must be run against **both** flavours before a submission
 that claims either declaration.
+
+## Planned answers from M1c (NOT yet in force; the current build has no RevenueCat)
+
+Under DR-2026-09-25-FACE-NEVER-LEAVES-DEVICE, the store forms change **in the same build that ships RevenueCat**, never earlier. A form must describe the binary it ships with.
+
+**Play Data safety**
+- "Does your app collect or share user data?" → **Yes.**
+- **Financial info → Purchase history:** collected; not shared (RevenueCat acts as a service provider); required; purpose "App functionality"; encrypted in transit; deletion on request.
+- **Photos, biometrics, face data:** still **No**. The face never leaves the device.
+- No other data types, provided no RevenueCat integrations are enabled.
+
+**Health apps declaration**
+- The store build ships without Module B (proposed DR-2026-09-25-STORE-ARTEFACT-SCOPE), so the answer is "no health features".
+
+**Apple privacy label (M2)**
+- **Purchases → Purchase History:** not linked to the user; not used for tracking.
+- Confirm against RevenueCat's current iOS guidance at M2.
+
+Source: `docs/MONETISATION_AUDIT_2026-09.md` D4 §5.

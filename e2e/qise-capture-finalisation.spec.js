@@ -2,6 +2,8 @@ import { test, expect } from "@playwright/test";
 import {
   buildSyntheticCapture, fakeMediaPipeModuleSource, fakeGetUserMediaInitScript,
 } from "./support/synthetic-capture.js";
+import { faceGuideRect } from "../src/qise/frame-geometry.js";
+import { DISTANCE_MIN_FRACTION } from "../src/qise/gates.js";
 
 /*
  * PHASE 5 verification — production must not have regressed when it picked
@@ -49,4 +51,89 @@ test("production: a well-framed, evenly lit, sharp synthetic face completes a ca
   page.on("pageerror", (e) => errors.push(String(e)));
   await page.waitForTimeout(200);
   expect(errors).toEqual([]);
+});
+
+/*
+ * Regression check for the parity gap CLAUDE.md item 57 documents as fixed
+ * in beta but not production: production's #face-guide was a static CSS
+ * oval with no relationship to DISTANCE_MIN_FRACTION, so a face that
+ * visibly filled the on-screen oval could still fail the distance gate.
+ * This drives the real capture code and asserts the guide's inline style
+ * is DERIVED from faceGuideRect() against the actual rendered box and the
+ * real buffer dimensions, not left on its static fallback.
+ */
+test("production: the face guide is sized from faceGuideRect(), not the static CSS fallback", async ({ page }) => {
+  const capture = buildSyntheticCapture();
+  await installSyntheticCamera(page, capture);
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/qise.html");
+
+  await page.click("#consent-next");
+  await page.click("#consent-grant");
+
+  // applyFaceGuide() runs synchronously right after attachCameraPreview()
+  // resolves, which itself only resolves once the video reports real
+  // dimensions (item 50) — so waiting on videoWidth is sufficient.
+  await page.waitForFunction(() => {
+    const v = document.getElementById("preview");
+    return Boolean(v && v.videoWidth > 0);
+  }, { timeout: 20000 });
+
+  const guideStyle = await page.locator("#face-guide").evaluate((el) => ({
+    left: el.style.left, top: el.style.top, width: el.style.width, height: el.style.height,
+  }));
+
+  // Must have been set by JS (inline style overriding the class), not left
+  // on the static CSS fallback.
+  expect(guideStyle.left).not.toBe("");
+  expect(guideStyle.left).not.toBe("17%");
+
+  const box = await page.locator("#capture-frame").evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    return { width: r.width, height: r.height };
+  });
+  const expected = faceGuideRect({
+    bufferWidth: capture.width,
+    bufferHeight: capture.height,
+    boxWidth: box.width,
+    boxHeight: box.height,
+    minInterocularFraction: DISTANCE_MIN_FRACTION,
+  });
+
+  // Compared as numbers, not as exact strings: app.js writes a `.toFixed(3)`
+  // string into the inline style, but the browser's CSSOM re-serializes a
+  // percentage on readback and drops an insignificant trailing zero
+  // ("25.350%" round-trips as "25.35%", "10.000%" as "10%") — verified
+  // directly against this engine, not assumed. A string comparison is
+  // therefore fragile to exactly how "round" the current box's pixel
+  // dimensions happen to be, which has nothing to do with whether the guide
+  // was actually derived from faceGuideRect(). Real, unrelated regressions
+  // in the computed fraction still fail this at ordinary float precision.
+  expect(parseFloat(guideStyle.left)).toBeCloseTo(expected.leftFraction * 100, 3);
+  expect(parseFloat(guideStyle.top)).toBeCloseTo(expected.topFraction * 100, 3);
+  expect(parseFloat(guideStyle.width)).toBeCloseTo(expected.widthFraction * 100, 3);
+  expect(parseFloat(guideStyle.height)).toBeCloseTo(expected.heightFraction * 100, 3);
+});
+
+/*
+ * Real-time ghost-outline feedback: the guide oval reflects the pose gate's
+ * live status (set from gates.js's own `failures` array — no new threshold),
+ * so a well-posed face should see it turn positive WHILE STILL LOOKING AT
+ * THE CAMERA, not only find out after a completed or failed attempt. This
+ * drives the real capture loop and watches for the DOM state transition,
+ * rather than asserting on app.js source (which nothing else can import —
+ * item 44) or by construction alone.
+ */
+test("production: the face guide turns positive in real time for a well-posed synthetic face", async ({ page }) => {
+  const capture = buildSyntheticCapture();
+  await installSyntheticCamera(page, capture);
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/qise.html");
+
+  await page.click("#consent-next");
+  await page.click("#consent-grant");
+
+  // Reached during the live preview, well before finish() navigates away to
+  // #screen-reading (asserted separately by the finalisation test above).
+  await expect(page.locator("#face-guide")).toHaveAttribute("data-pose", "pass", { timeout: 20000 });
 });
