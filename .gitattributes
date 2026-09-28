@@ -1,0 +1,11 @@
+# Byte-identical checkouts on every OS. Without this, Windows runners check
+# out with core.autocrlf and every "\n"-anchored test or tool quietly breaks
+# (three static guards and the billing falsifier did, 25 Sep 2026).
+* text=auto eol=lf
+
+# Binary: never normalised, never diffed as text.
+*.png binary
+*.y4m binary
+*.zip binary
+*.task binary
+*.wasm binary

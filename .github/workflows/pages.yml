@@ -73,7 +73,12 @@ jobs:
             if curl -fsS "${PAGE_URL}qise.html?verify=${verify}" -o /tmp/qise.html \
               && curl -fsS "${PAGE_URL}build-info.json?verify=${verify}" -o /tmp/build-info.json \
               && EXPECTED_SHA="$EXPECTED_SHA" node -e "const fs=require('node:fs');const b=JSON.parse(fs.readFileSync('/tmp/build-info.json','utf8'));if(b.commitSha!==process.env.EXPECTED_SHA)process.exit(1)" \
-              && grep -q '<title>Qi Se tracker</title>' /tmp/qise.html; then
+              && grep -q '<title>Qi Se tracker</title>' /tmp/qise.html \
+              && curl -fsS "${PAGE_URL}index.html?verify=${verify}" -o /tmp/index.html \
+              && curl -fsS "${PAGE_URL}sw.js?verify=${verify}" -o /tmp/sw.js \
+              && generation="$(grep -oE 'qise\.html\?v=[0-9]+' /tmp/index.html | grep -oE '[0-9]+$' | head -1)" \
+              && [ -n "$generation" ] \
+              && grep -q "mienshiang-v${generation}\"" /tmp/sw.js; then
               ok=1
               break
             fi
