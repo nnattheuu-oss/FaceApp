@@ -56,6 +56,22 @@ export const ASSISTED_LIMITS = Object.freeze({
 export const ASSISTABLE_GATES = Object.freeze(Object.keys(ASSISTED_LIMITS));
 export const LIGHT_OVERRIDE_DELAY_MS = 5000;
 export const OVERRIDABLE_LIGHT_GATES = Object.freeze(["sidelight", "illuminant"]);
+
+/*
+ * DR-2026-09-28-SCLERA-NOT-A-DEAD-END. `illuminant` is BLOCKED whenever the
+ * sclera sample is short, and the blocked pair is not overridable, so a face
+ * whose eye-whites read persistently short (narrow or hooded eyes, glasses
+ * glare, a smile) could never pass and never scan. After SCLERA_GRACE_MS
+ * with only sclera/illuminant unresolved, the sclera failure becomes
+ * tolerated: the capture proceeds at the assisted tier with
+ * `scleraValid: false`, the record stores raw (uncorrected) metrics under
+ * the distinct `qiseUncorrected` method stamp, and the reading names it. A
+ * MEASURED out-of-tolerance illuminant is not degradable. The grace clock
+ * matches the light override delay so the two "keep going anyway" decisions
+ * land together.
+ */
+export const SCLERA_GRACE_MS = LIGHT_OVERRIDE_DELAY_MS;
+export const SCLERA_DEGRADABLE_GATES = Object.freeze(["sclera", "illuminant"]);
 /**
  * How far past its strict limit an overridable light gate may be and still be
  * accepted by "Use this light anyway" (M1a fix (e)). Side light has no entry
@@ -224,7 +240,12 @@ export const GATES = Object.freeze([
     message: "Open your eyes a little wider.",
     evaluate: (_stats, _landmarks, sclera) => {
       if (!sclera) return null;
-      return { value: sclera.pixelCount, limit: SCLERA_MIN_PIXELS, margin: marginAbove(sclera.pixelCount, SCLERA_MIN_PIXELS) };
+      // The WINDOW judge, not the single frame (DR-2026-09-28-SCLERA-NOT-
+      // A-DEAD-END): the count is noisy frame to frame, and a per-frame
+      // judgement made this gate flip every second so the burst never
+      // completed. Callers without a window fall back to the raw count.
+      const count = sclera.window ? sclera.window.count : sclera.pixelCount;
+      return { value: count, limit: SCLERA_MIN_PIXELS, margin: marginAbove(count, SCLERA_MIN_PIXELS) };
     },
   },
   {
@@ -618,10 +639,30 @@ export function evaluateGates(frameStats, landmarks, scleraResult, options = {})
       }
     }
   }
+  // The sclera degrade (DR-2026-09-28-SCLERA-NOT-A-DEAD-END). It runs after
+  // the grace tolerance and the override above so an ordinary tolerated
+  // failure keeps its existing semantics. The conditions are deliberately
+  // narrow: the caller opted in, the full SCLERA_GRACE_MS has elapsed, and
+  // every remaining failure is sclera-blocked (sclera itself short, or the
+  // illuminant BLOCKED by it — status "blocked", no value). A MEASURED
+  // illuminant failure carries status "fail" with a value, so it can never
+  // enter this set: the hard stop survives unchanged.
+  const scleraDegrade = Boolean(options.degradeSclera) && elapsedMs >= SCLERA_GRACE_MS;
+  if (scleraDegrade) {
+    const remaining = failures.filter((failure) => !tolerated.includes(failure));
+    const allScleraBlocked = remaining.length > 0 && remaining.every(
+      (failure) => SCLERA_DEGRADABLE_GATES.includes(failure.id)
+        && (failure.id === "sclera" || failure.status === "blocked"),
+    );
+    if (allScleraBlocked) {
+      for (const failure of remaining) tolerated.push(failure);
+    }
+  }
   const toleratedIds = new Set(tolerated.map((failure) => failure.id));
   const unresolved = failures.filter((failure) => !toleratedIds.has(failure.id));
   const strictPass = failures.length === 0;
   const assistedPass = !strictPass && graceReached && unresolved.length === 0;
+  const scleraDegraded = tolerated.some((failure) => failure.id === "sclera");
 
   return {
     pass: strictPass || assistedPass,
@@ -631,5 +672,6 @@ export function evaluateGates(frameStats, landmarks, scleraResult, options = {})
     tolerated,
     margins,
     worst,
+    scleraValid: !scleraDegraded,
   };
 }

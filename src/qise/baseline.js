@@ -339,12 +339,26 @@ export const JITTER_HALF_POINT = 1.5;
  */
 export const ASSISTED_CAPTURE_CONFIDENCE = 0.78;
 
-export function readingConfidence({ scleraConfidenceValue, validFraction, frameJitter, captureTier }) {
+/*
+ * A sclera-degraded reading (DR-2026-09-28-SCLERA-NOT-A-DEAD-END) carries no
+ * sclera sample, so `scleraConfidenceValue` arrives as null — NOT the 0 that
+ * `sampleSclera` returns on refusal. Feeding that 0 here would make every
+ * degraded reading hollow (LOW_CONFIDENCE 0.6, out of the pattern engine),
+ * which is the opposite of the degrade's intent: the reading is less
+ * precise, not unreadable. The degraded floor is the assisted tier's
+ * confidence: the same value an override-accepted light capture gets.
+ */
+export const SCLERA_DEGRADED_CONFIDENCE = ASSISTED_CAPTURE_CONFIDENCE;
+
+export function readingConfidence({ scleraConfidenceValue, scleraValid, validFraction, frameJitter, captureTier }) {
   const jitterTerm = typeof frameJitter === "number"
     ? JITTER_HALF_POINT / (JITTER_HALF_POINT + Math.max(0, frameJitter))
     : 1;
+  const scleraTerm = scleraValid === false
+    ? SCLERA_DEGRADED_CONFIDENCE
+    : (typeof scleraConfidenceValue === "number" ? scleraConfidenceValue : 1);
   const parts = [
-    typeof scleraConfidenceValue === "number" ? scleraConfidenceValue : 1,
+    scleraTerm,
     typeof validFraction === "number" ? validFraction : 1,
     jitterTerm,
     captureTier === "assisted" ? ASSISTED_CAPTURE_CONFIDENCE : 1,

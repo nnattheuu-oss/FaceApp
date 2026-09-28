@@ -1780,6 +1780,31 @@ the watchdog), `qise-dim-feed` and `qise-store-blocked`. **A new `await` on
 the path from boot to capture needs a deadline and a named state, or it is
 this defect again.**
 
+### 60. The sclera gate judges a window and degrades; it never dead-ends
+
+**Symptom:** a face every gate accepts sits on "Open your eyes naturally"
+forever — the burst never completes, no reading, no path forward.
+
+**Cause:** the sclera count is noisy frame to frame (a measured run hovered
+144..153 against the hard 150) and was judged per frame, so the sclera and
+illuminant gates flipped every second. `illuminant` is BLOCKED while sclera
+is short and the blocked pair is not overridable, so persistently short
+eye-whites (smile, narrow or hooded eyes, glasses glare) could never scan.
+
+**Pins:** the sclera gate consumes the window count from
+`scleraWindowStatus()` (`sclera.js`, `SCLERA_WINDOW_FRAMES = 9`,
+`SCLERA_WINDOW_TOLERANCE = 6`, derived as 150 - 144 from the measured low
+mode — never retune this number without a new recorded measurement). After
+`SCLERA_GRACE_MS` with only sclera/sclera-blocked failures left,
+`evaluateGates` with `degradeSclera: true` tolerates them: capture proceeds
+at the assisted tier with `scleraValid: false`, the record carries the
+`qiseUncorrected` method stamp (never mixed into the corrected baseline),
+`readingConfidence` floors the sclera term at the assisted tier (never
+`sampleSclera`'s refusal 0), and the reading names the uncorrected colours.
+A MEASURED illuminant failure is not degradable. `tests/qise/sclera-window.test.js`
+pins all of it, including the static wiring in `app.js`. Any new sclera
+threshold must record its derivation where it is defined.
+
 ### 24. The summary may only repeat what was measured
 
 `reading/summary.js` builds the receipt shown above the detailed sections. It is
