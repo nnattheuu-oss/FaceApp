@@ -312,7 +312,9 @@ async function runCapture() {
   }
   show("screen-capture");
   renderCaptureGuide();
-  setCapturePrompt("Opening the camera", "Bring your face into the oval.");
+  // Each startup step names itself, so a stall is visible and reportable
+  // rather than a black oval under a prompt that never changes.
+  setCapturePrompt("Asking for the camera", "Allow camera access if Chrome asks.");
   $("ring-fill").setAttribute("stroke-dashoffset", "100");
   $("capture-help").hidden = true;
   clearIlluminationPhase();
@@ -342,15 +344,18 @@ async function runCapture() {
     consent, mediaDevices: navigator.mediaDevices, negotiate: false,
   });
   if (runId !== captureRun) {
+    console.warn("qise: a newer capture started while the camera opened; releasing this one");
     releaseCapture({ stream: opened.stream, images: [], landmarks: [], canvas: null });
     return;
   }
 
   let landmarker = null;
   try {
+    setCapturePrompt("Starting the preview", "Bring your face into the oval.");
     await attachCameraPreview(video, opened.stream);
     applyFaceGuide(video);
     const focus = await ensureContinuousFocus(opened.track);
+    setCapturePrompt("Loading the face reader", "First scan only: this can take a few seconds.");
     landmarker = await buildLandmarker("VIDEO");
     opened.focusSupported = focus.supported;
     setCapturePrompt("Finding your face", "Keep your full face inside the oval.");
@@ -362,6 +367,7 @@ async function runCapture() {
     throw error;
   }
   if (runId !== captureRun) {
+    console.warn("qise: a newer capture started while the face reader loaded; releasing this one");
     if (typeof landmarker.close === "function") landmarker.close();
     releaseCapture({ stream: opened.stream, images: [], landmarks: [], canvas: null, video });
     return;
