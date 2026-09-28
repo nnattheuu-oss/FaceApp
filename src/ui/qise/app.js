@@ -38,7 +38,8 @@ import {
 } from "../../qise/upload.js";
 import { readRois } from "../../qise/rois.js";
 import { headPose } from "../../qise/pose.js";
-import { sampleSclera } from "../../qise/sclera.js";
+import { sampleSclera, scleraWindowStatus, SCLERA_WINDOW_FRAMES } from "../../qise/sclera.js";
+import { MEASUREMENT_METHOD } from "../../measurement-method.js";
 import {
   SETTLE_MS, ILLUMINATION_READY_MS, createIlluminationSession, illuminationPhase, meanFaceRgb,
   recordIlluminationSample, summarizeIllumination, publicIlluminationSummary,
@@ -478,7 +479,9 @@ async function runCapture() {
   const startedAt = performance.now();
 
   const history = await currentReadings();
-  const scleraHistory = history.map((r) => r.sclera && r.sclera.rawRatios).filter(Boolean);
+  const scleraHistory = history
+    .map((r) => r.scleraValid !== false && r.sclera && r.sclera.rawRatios)
+    .filter(Boolean);
 
   const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const useIllumination = illuminationRequested && !reducedMotion;
@@ -492,6 +495,12 @@ async function runCapture() {
   let settleUntil = 0;
 
   let lastSclera = null, lastRois = null;
+  /*
+   * Trailing per-face-frame sclera counts for the window judge. Reset on face
+   * loss with the rest of the per-face state, so one face's window can never
+   * bleed into the next face's judgement.
+   */
+  const scleraCounts = [];
 
   /**
    * Abandon a running screen-light session, wherever the loop noticed.
@@ -613,14 +622,26 @@ async function runCapture() {
 
       lastRois = readRois(image, pts, { mirrored: false }, color);
       lastSclera = sampleSclera(image, pts, { mirrored: false }, { samples: scleraHistory });
+      scleraCounts.push(lastSclera.pixelCount);
+      if (scleraCounts.length > SCLERA_WINDOW_FRAMES) scleraCounts.shift();
+      /*
+       * The sclera gate judges the WINDOW, not this frame: the count is noisy
+       * frame to frame (a measured run hovered 144..153 against the hard 150),
+       * and a per-frame judgement made the gate flip every second so the
+       * burst never completed. The window status rides on the sample the gates
+       * already consume; `lastSclera` stays the raw per-frame sample, because
+       * that is what the record and the drift window describe.
+       */
+      const scleraWindow = scleraWindowStatus({ counts: scleraCounts });
 
       smoother.push(Object.fromEntries(
         Object.entries(lastRois.rois).map(([k, v]) => [k, v.polygons.map((p) => p.hull)])));
 
       const stats = frameStats(image, lastRois, canvas.width, drift, headPose(pts));
-      const gates = evaluateGates(stats, pts, lastSclera, {
+      const gates = evaluateGates(stats, pts, { ...lastSclera, window: scleraWindow }, {
         elapsedMs: nowMs - startedAt,
         acceptUnevenLight: lightOverrideRequested,
+        degradeSclera: true,
       });
       const illuminationStable = illuminationFrameStable(gates);
 
@@ -883,7 +904,7 @@ async function runCapture() {
         clearInterval(watchdog);
         await finish(held.burst, lastRois, lastSclera, { ...opened, captureMode },
           history, held.armContext.margins, illuminationSummary, held.armContext.captureTier,
-          image, pts);
+          gates.scleraValid, image, pts);
         return;
       }
     } else {
@@ -903,6 +924,7 @@ async function runCapture() {
       burstControl.faceLost();
       previous = null;
       drift.length = 0;
+      scleraCounts.length = 0;
       // Measure the frame even without a face: a dark room, or a camera
       // delivering pure black (Android Quick Settings "Camera access" off),
       // must be named, and darkness must be able to arm the screen assist.
@@ -1211,6 +1233,9 @@ async function finish(burst, rois, sclera, opened, history, gateMargins, illumin
     confidence, 
     timestampIso: currentTimestamp,
     captureMode: captureClass,
+    methodVersion: scleraUncorrected
+      ? MEASUREMENT_METHOD.qiseUncorrected
+      : MEASUREMENT_METHOD.qiseCorrected,
   });
 
   let integrated = null;
@@ -1773,6 +1798,9 @@ async function renderReading(reading) {
   }
   if (m.sparkline.basisChanged) {
     notices.push("The line breaks where the set of readable areas changed — the two stretches are not on the same footing.");
+  }
+  if (reading.scleraValid === false) {
+    notices.push("The light check couldn't read your eyes today, so colours are uncorrected.");
   }
   if (reading.captureTier === "assisted") {
     notices.push("This scan used the room-light tolerance. It stays in the column, with a small confidence reduction.");

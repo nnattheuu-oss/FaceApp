@@ -165,7 +165,7 @@ test("the accepted frame reaches integration before capture teardown erases it",
   assert.ok(start >= 0 && end > start, "capture completion branch not found");
   assert.doesNotMatch(completion, /clearFrame\s*\(/,
     "the accepted frame was erased before its structural reading ran");
-  assert.match(completion, /captureTier,\s*image, pts\)/,
+  assert.match(completion, /captureTier,\s*gates.scleraValid, image, pts\)/,
     "the accepted frame and map do not reach the integration boundary");
 });
 

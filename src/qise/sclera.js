@@ -34,6 +34,52 @@ import { pointInPolygon } from "./rois.js";
 /** Below this many surviving pixels the estimate is not worth having. */
 export const SCLERA_MIN_PIXELS = 150;
 
+/*
+ * The sclera count is noisy frame to frame (an instrumented 960-wide run
+ * hovered 144..153 around the hard 150), and a per-frame judgement made the
+ * sclera and illuminant gates flip every second, so the 9-consecutive-ready-
+ * frame burst could never complete. The window judge is the MEDIAN of the
+ * trailing window with a small tolerance: the measured oscillation's low
+ * mode is 144, and the median of an ODD-length alternation picks the
+ * majority phase, so the low-phase window medians exactly 144. The
+ * tolerance is derived as SCLERA_MIN_PIXELS - 144 (150 - 144 = 6), not
+ * guessed, and a face whose eye-whites are genuinely short reads a
+ * steady count far below that bar and is handled by the degrade path. A bare median without tolerance would still
+ * fail the oscillating face; a "m of N frames" count-based statistic fails
+ * it too, because an odd-length alternation clears only 4 or 5 frames —
+ * the count and the median land in the same place, and the median is the
+ * honest number to display. The window spans the burst length, mirroring
+ * how the burst itself aggregates nine whole frames. The tolerance is a
+ * measurement-smoothing allowance, not a threshold change: the limit is
+ * still 150 (DR-2026-09-06 principle 4), and a count must still reach
+ * 150 - SCLERA_WINDOW_TOLERANCE on the median of nine frames.
+ */
+export const SCLERA_WINDOW_FRAMES = 9;
+export const SCLERA_WINDOW_TOLERANCE = 6;
+
+/**
+ * Judge a trailing window of per-frame sclera pixel counts.
+ *
+ * @param {{counts?: number[]}} input recent face-frame counts, oldest first
+ * @returns {{pass: boolean, count: number, reason: string|null}}
+ */
+export function scleraWindowStatus({ counts } = {}) {
+  const window = (counts || []).slice(-SCLERA_WINDOW_FRAMES);
+  const median = (xs) => {
+    const s = [...xs].sort((a, b) => a - b);
+    const m = s.length >> 1;
+    return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+  };
+  const count = median(window);
+  if (window.length < SCLERA_WINDOW_FRAMES) {
+    return { pass: false, count, reason: "window_not_full" };
+  }
+  if (count >= SCLERA_MIN_PIXELS - SCLERA_WINDOW_TOLERANCE) {
+    return { pass: true, count, reason: null };
+  }
+  return { pass: false, count, reason: "too_few_pixels" };
+}
+
 /** Coarse backstop only: a ratio this far off neutral is a strange illuminant. */
 export const SCLERA_ABSOLUTE_TOLERANCE = 0.25;
 

@@ -79,7 +79,8 @@ export function toRecord(reading) {
   // incompatible method tag and accidentally relabel it as a legacy v2 row.
   // Other methods need their own approved schema, not a silent migration.
   if (Object.hasOwn(r, "methodVersion")
-      && !sameMeasurementMethod(r.methodVersion, MEASUREMENT_METHOD.qiseCorrected)) {
+      && !sameMeasurementMethod(r.methodVersion, MEASUREMENT_METHOD.qiseCorrected)
+      && !sameMeasurementMethod(r.methodVersion, MEASUREMENT_METHOD.qiseUncorrected)) {
     throw new TypeError("Incompatible measurement method for the Qi Se record schema.");
   }
   return {
@@ -134,6 +135,13 @@ export function toRecord(reading) {
     integrated: projectIntegratedReading(r.integrated),
 
     gateMargins: scalarMap(r.gateMargins),
+    // The sclera degrade's own flag: false says this reading's colour metrics
+    // are raw and it carries the qiseUncorrected method stamp. The method
+    // key is emitted only when present: the schema guard below rejects an
+    // unknown method, and a null written for pre-degrade rows would be
+    // indistinguishable from one on the read path.
+    scleraValid: r.scleraValid !== false,
+    ...(Object.hasOwn(r, "methodVersion") ? { methodVersion: r.methodVersion } : {}),
 
     sclera: r.sclera ? {
       gains: scalarMap(r.sclera.gains, ["r", "g", "b"]),
