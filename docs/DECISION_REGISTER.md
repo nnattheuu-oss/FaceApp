@@ -819,6 +819,20 @@ Use this register to stop prompts, discussions and implementation from collapsin
   - `tests/source-integrity.test.js`'s SHELL-exists check, now scoped to the `SHELL` array.
 - **If the MediaPipe pin changes,** `VENDOR_CACHE` must change with it. The test fails if it does not.
 
+### DR-2026-09-28-GATE0-HARDENING
+
+- **Status:** implemented in PR #6 (merge `aed35ef`) and PR #7 (merge `dee13c1`), under the owner-approved 28 September Gate 0 plan. PR #6's push-triggered Pages deploy (run #6) succeeded end to end, the first push deploy to do so.
+- **Old-generation readings are hidden, not deleted.** `currentGenerationReadings()` (`src/qise/baseline.js`) keeps rows with `baselineVersion === "v2"`, and `src/ui/qise/app.js`'s single `currentReadings()` accessor is the only production `store.all()` read. Export and "delete all" still act on every row.
+  - **Consequence for a returning phone:** a phone whose only readings came from the 9 August build (`baselineVersion: null` after the DB upgrade) now shows an **empty history**, no "last reading" at boot, and a column that starts fresh at "anchor 1 of 4". This is a generation cut, not data loss: the rows are still on the device and still in an export.
+- **Beta-bench rows are deliberately kept, and the consequence is named here.**
+  - `src/beta/beta.js:891-899` stamps `baselineVersion: "v2"` and `captureClass: opened.captureMode || "auto"`, the same class as a live production scan. `beta-model.js` documents the shared baseline as intended ("same origin, same person").
+  - So `planSegment`, `baselineProgress`, patterns, the share column and the sclera drift window treat bench readings as ordinary live readings of the device owner's face.
+  - **If the bench is ever run on a synthetic video or on someone else's face, those numbers enter the owner's personal baseline and anchor count with nothing to distinguish them.**
+  - Accepted for now because the bench is excluded from the store artefact (`DR-2026-09-25-STORE-ARTEFACT-SCOPE`).
+  - If that changes, or bench use on non-owner faces is expected, the region-coverage work adds a bench-only `captureClass` value. `captureClass` already partitions the baseline in `interpretReading`, so no new mechanism is needed.
+- **Camera start is bounded (PR #7).** `openCamera` gives up after `CAMERA_OPEN_TIMEOUT_MS` (12 s, permission prompt included) with a named `CameraTimeoutError`. A late stream is stopped rather than left running. The capture screen names each startup step in order: "Asking for the camera" → "Starting the preview" → "Loading the face reader" → "Finding your face". The step strings are user-facing copy in `dist/`, so `npm run lint:bundle` scans them.
+- **Process rule, earned three times this session:** every review claim is re-verified against the current `origin/main` tip before it is folded into a plan. Two review claims (CRLF-committed files; beta rows lacking `captureClass`) and one plan line (Gate 0 "reload once") did not survive inspection. Both review claims came from a stale or OS-converted checkout.
+
 ## Unresolved proposals
 
 These must not be implemented as settled decisions without approval:
