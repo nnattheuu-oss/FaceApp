@@ -44,6 +44,7 @@ import {
   illuminationFrameStable, illuminationInterruption, abandonedIlluminationSummary,
 } from "../../qise/illumination.js";
 import { createScreenWakeLock } from "../../qise/wakelock.js";
+import { centreLuma, noFaceState, BLACK_FRAME_LUMA } from "../../qise/no-face.js";
 import { watchCaptureLifecycle } from "../../qise/capture-lifecycle.js";
 import {
   evaluateGates, captureGuide, captureInstruction, canUseCurrentLight, DISTANCE_MIN_FRACTION,
@@ -195,7 +196,7 @@ function selectReadingTab(name, { scroll = true } = {}) {
   if (scroll) window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function renderCaptureGuide(report = null) {
+function renderCaptureGuide(report = null, instruction = report ? captureInstruction(report) : null) {
   const guide = report ? captureGuide(report) : [
     { id: "frame", state: "waiting" }, { id: "light", state: "waiting" },
     { id: "camera", state: "waiting" }, { id: "steady", state: "waiting" },
@@ -212,7 +213,11 @@ function renderCaptureGuide(report = null) {
   if ($("capture-ready-count")) {
     $("capture-ready-count").textContent = `${readyCount} of ${guide.length} ready`;
   }
-  const instruction = captureInstruction(report);
+  // No report and no explicit instruction: reset the guide rows only. A bare
+  // call used to write captureInstruction(null) = "Opening the camera" over
+  // whatever the caller had just said — which is how "no face found" was
+  // reported as "the camera is still starting", forever.
+  if (!instruction) return;
   setCapturePrompt(instruction.title, instruction.detail, instruction.id === "ready" ? "ready" : "adjust");
 }
 
@@ -413,6 +418,8 @@ async function runCapture() {
   let modeNegotiationStarted = false;
   let exposureReleaseStarted = false;
   let underexposedSince = null;
+  let blackSince = null;
+  let noFaceDarkSince = null;
   let softSince = null;
   let screenLightSince = null;
   let refocusStarted = false;
@@ -546,6 +553,8 @@ async function runCapture() {
     const mesh = face.landmarks;
 
     if (mesh) {
+      blackSince = null;
+      noFaceDarkSince = null;
       // z is carried through, not dropped. Without it `headPose` can only
       // measure roll, and the pose gate silently stops checking two of its
       // three axes. MediaPipe normalises z by image WIDTH, the same as x, so
@@ -853,10 +862,26 @@ async function runCapture() {
       burstControl.faceLost();
       previous = null;
       drift.length = 0;
-      if (face.status === "multiple") {
-        setCapturePrompt("One face at a time", "Only the person being read should be in the oval.");
-      } else {
-        setCapturePrompt("Come into view", "Centre your face inside the oval.");
+      // Measure the frame even without a face: a dark room, or a camera
+      // delivering pure black (Android Quick Settings "Camera access" off),
+      // must be named, and darkness must be able to arm the screen assist.
+      const luma = centreLuma(image);
+      blackSince = luma !== null && luma < BLACK_FRAME_LUMA ? (blackSince ?? nowMs) : null;
+      const noFace = noFaceState({
+        multiple: face.status === "multiple",
+        luma,
+        blackForMs: blackSince === null ? 0 : nowMs - blackSince,
+      });
+      noFaceDarkSince = noFace.dark ? (noFaceDarkSince ?? nowMs) : null;
+      if (shouldUseScreenFlash({
+        issuePresent: noFace.dark,
+        issueForMs: noFaceDarkSince === null ? 0 : nowMs - noFaceDarkSince,
+        enabled: screenLightRequested,
+        dismissed: screenLightDismissed,
+        illuminationActive: Boolean(illuminationSession),
+      })) {
+        setScreenLight(true);
+        screenLightSince = nowMs;
       }
       underexposedSince = null;
       softSince = null;
@@ -879,7 +904,7 @@ async function runCapture() {
       $("use-current-light").hidden = true;
       exposureHalo?.setCaptureState("seeking");
       if (!screenLightRequested) $("screen-light").hidden = true;
-      renderCaptureGuide();
+      renderCaptureGuide(null, noFace);
       $("capture-help").hidden = true;
     }
 
