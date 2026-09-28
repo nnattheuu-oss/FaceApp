@@ -1750,6 +1750,36 @@ one.** Its threshold was not the problem — the assist was. Re-deriving
 `EXPOSURE_MAX_FRACTION` still needs physical-device evidence across tone strata,
 same as the `underexposed` metric it mirrors (see "Known gaps").
 
+### 59. Every wait between "open the app" and a named state is bounded
+
+The owner's Gate 0 runs (28 Sep) froze on a prompt that never changed, and
+each freeze was an `await` with no deadline or an event that never came. The
+rule now: every step from boot to the first measured frame ends in a named
+on-screen state within a bounded time.
+
+| Wait | Bound | Named state |
+|---|---|---|
+| `openStore()` at boot (runs before any button is wired) | `blocked` event, or `STORE_OPEN_TIMEOUT_MS` | `#boot-error`: close the other copy, reload |
+| `getUserMedia` | `CAMERA_OPEN_TIMEOUT_MS` | `CameraTimeoutError` |
+| `video.play()` + first frame | `CAMERA_READY_TIMEOUT_MS`, armed BEFORE `play()` | `CameraNoFramesError` |
+| face-model load | `MODEL_LOAD_TIMEOUT_MS` | `ModelLoadError` |
+| frames stopping mid-capture | `FRAME_STALL_MS` watchdog | one restart, then "isn't sending pictures" |
+| frames arriving, no face | `noFaceState()` | black / dark / come into view |
+
+**Symptom:** a screen that sits on "Opening the camera", "Starting the
+preview" or a welcome page that ignores taps — read as "the app is broken"
+with nothing to report.
+**Cause:** `play()` on a MediaStream settles only after a decoded frame; an
+IndexedDB upgrade blocked by an older open copy stays pending indefinitely;
+a boot failure that was only `console.error`ed.
+**Pinned by:** `tests/qise/camera-start-bounded.test.js`,
+`tests/qise/camera-watchdog.test.js`, `tests/qise/store-open-bounded.test.js`,
+`tests/qise/no-face-feedback.test.js`, and the e2e specs
+`qise-no-frames`, `qise-black-feed` (including that black frames never trip
+the watchdog), `qise-dim-feed` and `qise-store-blocked`. **A new `await` on
+the path from boot to capture needs a deadline and a named state, or it is
+this defect again.**
+
 ### 24. The summary may only repeat what was measured
 
 `reading/summary.js` builds the receipt shown above the detailed sections. It is

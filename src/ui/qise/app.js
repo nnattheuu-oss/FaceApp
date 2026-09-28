@@ -60,7 +60,7 @@ import { passageFor } from "../../qise/passages.js";
 import { reflectionMode } from "../../qise/reading-flags.js";
 import { reflectionFor } from "../../qise/reading-pipeline.js";
 import { readingTiers } from "../../qise/reading-tiers.js";
-import { openStore } from "../../qise/store.js";
+import { openStore, describeStoreError } from "../../qise/store.js";
 import { readingScreenModel, historyColumnModel } from "./screens.js";
 import { SHARE_CADENCES, shareReadings } from "./share.js";
 import {
@@ -2068,6 +2068,22 @@ async function boot() {
   }
 }
 
+// A failed boot leaves every button unwired, so it must be visible: logging
+// alone produced a welcome screen that silently ignored every tap
+// (tests/qise/store-open-bounded.test.js).
+function showBootError(error) {
+  let banner = document.getElementById("boot-error");
+  if (!banner) {
+    banner = document.createElement("p");
+    banner.id = "boot-error";
+    banner.className = "boot-error";
+    banner.setAttribute("role", "alert");
+    document.body.prepend(banner);
+  }
+  banner.textContent = describeStoreError(error);
+}
+
 boot().catch((err) => {
   console.error("qise: boot failed", err);
+  showBootError(err);
 });
