@@ -6,7 +6,7 @@
 // Bumped when the shell list changes: the activate handler deletes every cache
 // whose name is not CACHE (or VENDOR_CACHE), so a stale v1 holding an old
 // SHELL cannot survive. Coupled to index.html's ?v= redirect (item 15).
-const CACHE = "mienshiang-v27";
+const CACHE = "mienshiang-v28";
 
 // The vendored MediaPipe assets are hash-pinned by scripts/build.js and never
 // change under a given pin, so they live in a cache named FOR the pin: the
@@ -87,6 +87,8 @@ const SHELL = [
   "./heritage/validator.js",
   // M1a scanner fixes (b), (c), (g).
   "./qise/capture-integrity.js", "./qise/capture-lifecycle.js",
+  // No-face feedback: darkness and black-frame detection (28 Sep).
+  "./qise/no-face.js",
   "./ui/qise/palette.js", "./ui/qise/seal.js", "./ui/qise/screens.js",
   "./ui/qise/share.js", "./ui/qise/paywall.js", "./ui/qise/theme.js", "./ui/qise/exposure-halo.js", "./ui/qise/app.js",
   "./manifest.webmanifest", "./icon-192.png", "./icon-512.png",
