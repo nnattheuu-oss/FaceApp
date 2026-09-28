@@ -322,7 +322,12 @@ export function calibrationModel(reading, history) {
   const atReading = (history || []).filter((item) => item?.valid !== false
     && (!reading?.timestampIso || String(item.timestampIso) <= String(reading.timestampIso))).length;
   const required = ANCHOR_READINGS;
-  const current = Math.max(1, Math.min(required, stored || atReading));
+  // The count derived from the (generation-filtered) history wins over a
+  // stored stamp that is LARGER than it: rows scanned while old-generation
+  // rows were still being counted carry an inflated baselineProgress, and a
+  // stamp is never re-written. With no history to count, the stamp stands.
+  const counted = stored && atReading ? Math.min(stored, atReading) : (stored || atReading);
+  const current = Math.max(1, Math.min(required, counted));
   // Scans until the first personal comparison, counting that scan itself: the
   // comparison is the scan AFTER the last anchor (M1a row 15).
   const remaining = required - current + 1;

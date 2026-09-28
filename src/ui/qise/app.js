@@ -52,6 +52,7 @@ import { frameStats } from "../../qise/framestats.js";
 import { computeReadingMetrics, lumRatioP90P50 } from "../../qise/metrics.js";
 import {
   interpretReading, readingConfidence, axesOf, planSegment, BASELINE_VERSION, ANCHOR_READINGS,
+  currentGenerationReadings,
 } from "../../qise/baseline.js";
 import { passageFor } from "../../qise/passages.js";
 import { reflectionMode } from "../../qise/reading-flags.js";
@@ -117,6 +118,14 @@ function applyFaceGuide(video) {
 
 const consent = createConsent();
 let store = null;
+
+// The only production read of the store. Rows an earlier scanner generation
+// wrote (baselineVersion null after the DB upgrade) never reach history, the
+// share column, patterns, the anchor count, the sclera window or the boot.
+// Export and "delete all" still act on every row (store.exportAll/deleteAll).
+async function currentReadings() {
+  return currentGenerationReadings(await store.all());
+}
 let scratch = null;
 let activeShareCadence = "week";
 let captureRun = 0;
@@ -422,7 +431,7 @@ async function runCapture() {
   let previous = null;
   const startedAt = performance.now();
 
-  const history = await store.all();
+  const history = await currentReadings();
   const scleraHistory = history.map((r) => r.sclera && r.sclera.rawRatios).filter(Boolean);
 
   const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -985,7 +994,7 @@ async function runSelfie(file) {
       z: typeof point.z === "number" ? point.z * canvas.width : undefined,
     }));
     scratch.landmarks = [pts];
-    const history = await store.all();
+    const history = await currentReadings();
     const scleraHistory = history.map((reading) => reading.sclera?.rawRatios).filter(Boolean);
     const rois = readRois(image, pts, { mirrored: false }, color);
     const sclera = sampleSclera(image, pts, { mirrored: false }, { samples: scleraHistory });
@@ -1576,7 +1585,7 @@ async function renderReflection(reading, history) {
 }
 
 async function renderReading(reading) {
-  const history = await store.all();
+  const history = await currentReadings();
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const m = readingScreenModel(reading, history, { reducedMotion: reduced });
   currentReading = reading;
@@ -1719,7 +1728,7 @@ function drawSparkline(svg, model) {
 
 async function renderHistory() {
   const limit = SHARE_CADENCES[activeShareCadence].days;
-  const history = await store.all();
+  const history = await currentReadings();
   const col = historyColumnModel(history, { limit });
   $("history-column").innerHTML = col.rows.map((r) =>
     `<figure><button type="button" class="history-card" data-reading-timestamp="${esc(r.timestampIso)}" aria-label="Open reading from ${esc(r.date)}">
@@ -1746,7 +1755,7 @@ async function renderHistory() {
 async function shareCurrent(cadence) {
   const status = document.querySelector('.screen[data-active="true"] .share-status') || $("share-status");
   status.textContent = "Preparing your private share card…";
-  const result = await shareReadings(await store.all(), cadence, window, {
+  const result = await shareReadings(await currentReadings(), cadence, window, {
     entitlement: lastAccess?.entitlement ?? null,
   });
   status.textContent = {
@@ -1948,7 +1957,7 @@ async function boot() {
     location.reload();
   });
 
-  const last = (await store.all()).slice(-1)[0];
+  const last = (await currentReadings()).slice(-1)[0];
   const action = consentBootAction(consent.isGranted(), Boolean(last));
   if (action.screen === "screen-reading") {
     await renderReading(last);

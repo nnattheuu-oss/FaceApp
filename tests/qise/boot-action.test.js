@@ -44,7 +44,7 @@ test("only a real grant can start the camera at boot", () => {
 
 test("ui/qise/app.js boot starts the capture, and reports a failure instead of stranding it", () => {
   const source = readFileSync(new URL("../../src/ui/qise/app.js", import.meta.url), "utf8");
-  const tail = source.slice(source.lastIndexOf("const last = (await store.all())"));
+  const tail = source.slice(source.lastIndexOf("const last = (await currentReadings())"));
   assert.match(tail, /consentBootAction\(consent\.isGranted\(\), Boolean\(last\)\)/);
   assert.match(tail, /if \(action\.startCapture\)[\s\S]*?await runCapture\(\)/,
     "the boot must open the camera for a consented person with no reading");
