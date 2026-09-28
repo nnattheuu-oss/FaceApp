@@ -550,7 +550,7 @@ cache, which does not contain the new module.
 release that works perfectly on a fresh install.
 **Cause:** new entry in `SHELL`, unchanged `CACHE` name.
 
-Currently `mienshiang-v28` (v28: `qise/no-face.js`, 28 Sep; v27 was bumped in M1a when the capture-integrity and capture-lifecycle modules, plus 21 modules that had been missing from `SHELL`, were added — DR-2026-09-25-VENDOR-PRECACHE). `tests/sw-precache.test.js` now compares both entry pages' static import graphs against `SHELL`, so a missing module fails CI rather than an offline launch. The vendored MediaPipe assets live in a separate `VENDOR_CACHE` that a `CACHE` bump does not evict.
+Currently `mienshiang-v29` (v29: `qise/frame-watchdog.js`, 28 Sep; v28: `qise/no-face.js`; v27 was bumped in M1a when the capture-integrity and capture-lifecycle modules, plus 21 modules that had been missing from `SHELL`, were added — DR-2026-09-25-VENDOR-PRECACHE). `tests/sw-precache.test.js` now compares both entry pages' static import graphs against `SHELL`, so a missing module fails CI rather than an offline launch. The vendored MediaPipe assets live in a separate `VENDOR_CACHE` that a `CACHE` bump does not evict.
 
 **The version is coupled to `index.html`, which is easy to miss.** The entry
 redirect is `location.replace("./qise.html?v=<n>")`, and `<n>` must equal the

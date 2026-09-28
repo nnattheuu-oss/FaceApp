@@ -24,8 +24,9 @@ import {
   openCamera, attachCameraPreview, describeCameraError, describeSelfieError, loadFaceModel,
   createLandmarkerGuarded, releaseCapture, GreenLatch, PolygonSmoother, BURST_FRAMES, trimmedMedianLab, reduceBurst,
   negotiateCaptureMode, canNegotiateCaptureMode, exposureAssistState, releaseCaptureMode,
-  ensureContinuousFocus, requestCameraRefocus,
+  ensureContinuousFocus, requestCameraRefocus, CameraNoFramesError,
 } from "../../qise/camera.js";
+import { frameStall, shouldAutoRecover } from "../../qise/frame-watchdog.js";
 import {
   createLandmarkerWithFallback, selectSingleFace, SINGLE_FACE_NUM_FACES,
 } from "../../landmarker.js";
@@ -130,6 +131,9 @@ async function currentReadings() {
 let scratch = null;
 let activeShareCadence = "week";
 let captureRun = 0;
+// Automatic capture restarts since a face was last found. Budgeted so a
+// camera that keeps dropping cannot restart itself forever (frame-watchdog.js).
+let autoRecoveriesSinceFace = 0;
 let activeReadingTab = "today";
 
 /*
@@ -395,18 +399,47 @@ async function runCapture() {
   const lifecycle = watchCaptureLifecycle({
     documentRef: document,
     track: opened.track,
-    onRecover: (reason) => {
-      if (runId !== captureRun) return;
-      console.warn("qise: camera lost, restarting the capture", reason);
-      runCapture().catch((error) => {
-        console.error("qise: capture restart failed", error);
-        $("gate-line").textContent = describeCameraError(error);
-      });
-    },
+    onRecover: (reason) => recoverCapture(reason),
   });
+  // Restart once; after that, stop and say what is wrong instead of cycling
+  // through the startup steps with no explanation.
+  const recoverCapture = (reason) => {
+    if (runId !== captureRun) return;
+    if (!shouldAutoRecover({ recoveriesSinceFace: autoRecoveriesSinceFace })) {
+      console.warn("qise: camera lost again; not restarting automatically", reason);
+      // Not stopAfterLoopError: this can run from a track event before that
+      // function exists. Bumping captureRun is enough to end the loop — every
+      // frame callback checks it first — and releaseCapture stops the camera.
+      captureRun++;
+      if (scratch) releaseCapture(scratch);
+      scratch = null;
+      clearIlluminationPhase();
+      renderCaptureGuide();
+      $("gate-line").textContent = describeCameraError(new CameraNoFramesError());
+      return;
+    }
+    autoRecoveriesSinceFace++;
+    console.warn("qise: camera lost, restarting the capture", reason);
+    runCapture().catch((error) => {
+      console.error("qise: capture restart failed", error);
+      $("gate-line").textContent = describeCameraError(error);
+    });
+  };
+  // ── FRAME WATCHDOG ────────────────────────────────────────────────────────
+  // The loop runs on decoded frames, so a stream that stops delivering them
+  // (or never delivers the first) freezes the screen on its last prompt with
+  // no event to say so. Measure the silence (qise/frame-watchdog.js).
+  // Armed where the loop starts (armWatchdog, below), after every await in
+  // this function, so a tick can never reach stopAfterLoopError before it
+  // exists.
+  let lastFrameAt = null;
+  let watchdog = null;
   scratch = {
     canvas, images: [], landmarks: [], stream: opened.stream, landmarker, video,
-    wakeLock, lifecycle,
+    wakeLock,
+    // releaseCapture() disposes this on every way out, so the watchdog dies
+    // with the capture it watches.
+    lifecycle: { dispose() { clearInterval(watchdog); lifecycle.dispose(); } },
   };
 
   // ── EXPOSURE SETTLES BEFORE THE BURST CAN ARM ─────────────────────────────
@@ -512,7 +545,11 @@ async function runCapture() {
   // second real sample (src/qise/frame-scheduler.js).
   const scheduler = createFrameScheduler(video);
   const scheduleStep = () => scheduler.schedule((frameInfo) => {
-    step(frameInfo.now).catch(stopAfterLoopError);
+    lastFrameAt = performance.now();
+    // Stamped again once the frame is processed: a first GPU detect can take
+    // seconds, and the watchdog must measure silence from the camera, not
+    // time spent in MediaPipe.
+    step(frameInfo.now).catch(stopAfterLoopError).finally(() => { lastFrameAt = performance.now(); });
   });
 
   const step = async (nowMs) => {
@@ -553,6 +590,7 @@ async function runCapture() {
     const mesh = face.landmarks;
 
     if (mesh) {
+      autoRecoveriesSinceFace = 0;
       blackSince = null;
       noFaceDarkSince = null;
       // z is carried through, not dropped. Without it `headPose` can only
@@ -840,6 +878,9 @@ async function runCapture() {
         // say which, because captureMode is what tells a later baseline that
         // the class of capture changed.
         scheduler.stop();
+        // The loop is over; a save that takes longer than FRAME_STALL_MS is
+        // not a camera that stopped sending pictures.
+        clearInterval(watchdog);
         await finish(held.burst, lastRois, lastSclera, { ...opened, captureMode },
           history, held.armContext.margins, illuminationSummary, held.armContext.captureTier,
           image, pts);
@@ -911,6 +952,21 @@ async function runCapture() {
     clearFrame();
     scheduleStep();
   };
+  const armWatchdog = () => {
+    const startedAt = performance.now();
+    let visibleSince = startedAt;
+    let wasHidden = false;
+    watchdog = setInterval(() => {
+      if (runId !== captureRun) return;
+      const now = performance.now();
+      const visible = document.visibilityState !== "hidden";
+      if (!visible) { wasHidden = true; return; }
+      if (wasHidden) { wasHidden = false; visibleSince = now; return; }
+      const stall = frameStall({ startedAt, visibleSince, lastFrameAt, now, visible });
+      if (stall) recoverCapture(`no-frames:${lastFrameAt === null ? "never" : "stopped"}`);
+    }, 1000);
+  };
+  armWatchdog();
   scheduleStep();
 }
 
@@ -1950,10 +2006,15 @@ async function boot() {
       console.warn("qise: manual refocus failed", error);
     });
   });
-  $("restart-capture").addEventListener("click", () => runCapture().catch((e) => {
-    console.error(e);
-    $("gate-line").textContent = describeCameraError(e);
-  }));
+  $("restart-capture").addEventListener("click", () => {
+    // A person asking again (say, after switching Camera access on) gets a
+    // fresh automatic-restart allowance.
+    autoRecoveriesSinceFace = 0;
+    return runCapture().catch((e) => {
+      console.error(e);
+      $("gate-line").textContent = describeCameraError(e);
+    });
+  });
   $("go-history").addEventListener("click", () => renderHistory().catch((e) => console.error(e)));
   $("back-reading").addEventListener("click", () => show("screen-reading"));
   $("share-today").addEventListener("click", () => shareCurrent("today").catch((e) => {

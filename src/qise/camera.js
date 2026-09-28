@@ -20,6 +20,7 @@
  * baseline can be reset when the class of capture changes.
  */
 import { assertConsentGranted } from "./consent.js";
+import { NO_FRAMES_MESSAGE } from "./frame-watchdog.js";
 
 /** Nine frames keep a real median while shortening the post-lock capture. */
 export const BURST_FRAMES = 9;
@@ -133,12 +134,51 @@ export class ModelLoadError extends Error {
  * @param {()=>Promise<T>} step
  * @returns {Promise<T>}
  */
-export async function loadFaceModel(step) {
+export async function loadFaceModel(step, {
+  timeoutMs = MODEL_LOAD_TIMEOUT_MS,
+  setTimer = setTimeout,
+  clearTimer = clearTimeout,
+} = {}) {
+  let timer = null;
+  let timedOut = false;
+  const building = Promise.resolve().then(step);
+  // A build that finishes after the deadline is closed, never left holding
+  // a GPU context and a WASM heap for a capture that has already given up.
+  building.then((late) => {
+    if (timedOut && late && typeof late.close === "function") late.close();
+  }, (error) => {
+    if (timedOut) console.warn("qise/camera: face model failed after its deadline", error);
+  });
   try {
-    return await step();
+    return await Promise.race([
+      building,
+      new Promise((_, reject) => {
+        timer = setTimer(() => {
+          timedOut = true;
+          reject(new Error(`The face model did not load within ${timeoutMs} ms`));
+        }, timeoutMs);
+      }),
+    ]);
   } catch (error) {
     if (error?.name === "ConsentRequiredError" || error instanceof ModelLoadError) throw error;
     throw new ModelLoadError(error);
+  } finally {
+    if (timer !== null && !timedOut) clearTimer(timer);
+  }
+}
+
+/**
+ * The first load fetches ~13 MB (WASM runtime + model) on a phone that may be
+ * on a slow connection, so the bound is generous: it exists to end an
+ * indefinite "Loading the face reader", not to hurry a slow network.
+ */
+export const MODEL_LOAD_TIMEOUT_MS = 60000;
+
+/** A stream that opened but never delivered a decodable frame. */
+export class CameraNoFramesError extends Error {
+  constructor() {
+    super("The camera opened but delivered no frame");
+    this.name = "CameraNoFramesError";
   }
 }
 
@@ -148,6 +188,7 @@ export function describeCameraError(error) {
   if (name === "CameraTimeoutError") {
     return "The camera didn't start. Close other apps using it, then tap Restart camera. If Chrome asked, make sure camera access is allowed.";
   }
+  if (name === "CameraNoFramesError") return NO_FRAMES_MESSAGE;
   if (name === "ModelLoadError") {
     return "The face reader did not load. Your camera is fine. Check your connection, then tap Restart camera.";
   }
@@ -190,39 +231,44 @@ export async function attachCameraPreview(video, stream, {
 } = {}) {
   if (!video || !stream) throw new TypeError("attachCameraPreview requires a video and stream");
   video.srcObject = stream;
-  if (typeof video.play === "function") await video.play();
-  if (video.videoWidth > 0 && video.videoHeight > 0) return video;
+  const hasFrame = () => video.videoWidth > 0 && video.videoHeight > 0;
 
+  // The deadline is armed BEFORE play(). For a MediaStream, play() settles
+  // only once a frame has been decoded, so awaiting it first left a stream
+  // that never delivers one (another app holding the camera, a track that
+  // opens muted) on "Starting the preview" forever, with the timer below it
+  // never reached. tests/qise/camera-watchdog.test.js.
   await new Promise((resolve, reject) => {
+    let settled = false;
     let timer = null;
-    const cleanup = () => {
-      if (typeof video.removeEventListener === "function") {
+    const canListen = typeof video.addEventListener === "function"
+      && typeof video.removeEventListener === "function";
+    const finish = (fn, value) => {
+      if (settled) return;
+      settled = true;
+      if (canListen) {
         video.removeEventListener("loadedmetadata", ready);
         video.removeEventListener("canplay", ready);
         video.removeEventListener("error", failed);
       }
       if (timer !== null) clearTimer(timer);
+      fn(value);
     };
-    const ready = () => {
-      if (!(video.videoWidth > 0 && video.videoHeight > 0)) return;
-      cleanup();
-      resolve();
-    };
-    const failed = () => {
-      cleanup();
-      reject(new Error("The camera preview could not be decoded."));
-    };
-    if (typeof video.addEventListener !== "function") {
-      reject(new Error("The camera preview did not expose frame dimensions."));
-      return;
+    const ready = () => { if (hasFrame()) finish(resolve, video); };
+    const failed = () => finish(reject, new Error("The camera preview could not be decoded."));
+    if (canListen) {
+      video.addEventListener("loadedmetadata", ready);
+      video.addEventListener("canplay", ready);
+      video.addEventListener("error", failed);
     }
-    video.addEventListener("loadedmetadata", ready);
-    video.addEventListener("canplay", ready);
-    video.addEventListener("error", failed);
-    timer = setTimer(() => {
-      cleanup();
-      reject(new Error("Timed out waiting for the first camera frame."));
-    }, timeoutMs);
+    timer = setTimer(() => finish(reject, new CameraNoFramesError()), timeoutMs);
+    const played = typeof video.play === "function"
+      ? Promise.resolve().then(() => video.play())
+      : Promise.resolve();
+    played.then(() => {
+      if (hasFrame()) finish(resolve, video);
+      else if (!canListen) finish(reject, new Error("The camera preview did not expose frame dimensions."));
+    }, (error) => finish(reject, error));
   });
   return video;
 }
