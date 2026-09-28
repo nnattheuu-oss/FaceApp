@@ -40,6 +40,14 @@ export const CAPTURE_CONSTRAINTS = Object.freeze({
 export const CAMERA_READY_TIMEOUT_MS = 8000;
 
 /**
+ * How long getUserMedia may take, permission prompt included, before the
+ * capture screen says so. Without a bound, a request that never settles left
+ * the screen on "Opening the camera" forever (owner's Gate 0 run, 28 Sep:
+ * permission allowed, no camera-in-use dot, no error).
+ */
+export const CAMERA_OPEN_TIMEOUT_MS = 12000;
+
+/**
  * Ask mobile browsers to keep autofocus alive without touching exposure or
  * white balance. Capability detection is mandatory: unsupported advanced
  * constraints are commonly stripped without an error.
@@ -137,6 +145,9 @@ export async function loadFaceModel(step) {
 /** Turn browser camera errors into a useful next action rather than a dead preview. */
 export function describeCameraError(error) {
   const name = error?.name || "";
+  if (name === "CameraTimeoutError") {
+    return "The camera didn't start. Close other apps using it, then tap Restart camera. If Chrome asked, make sure camera access is allowed.";
+  }
   if (name === "ModelLoadError") {
     return "The face reader did not load. Your camera is fine. Check your connection, then tap Restart camera.";
   }
@@ -381,6 +392,42 @@ export async function negotiateCaptureMode(track) {
 }
 
 /**
+ * getUserMedia with a deadline. A stream that arrives after the deadline is
+ * stopped at once: the screen has already told the person the camera did not
+ * start, and a camera left running behind that message is the worst outcome.
+ */
+function boundedGetUserMedia(mediaDevices, constraints, { timeoutMs, setTimer, clearTimer }) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timer = setTimer(() => {
+      if (settled) return;
+      settled = true;
+      const error = new Error(`qise/camera: no camera stream after ${timeoutMs} ms`);
+      error.name = "CameraTimeoutError";
+      reject(error);
+    }, timeoutMs);
+    Promise.resolve()
+      .then(() => mediaDevices.getUserMedia(constraints))
+      .then((stream) => {
+        if (settled) {
+          const tracks = typeof stream?.getTracks === "function" ? stream.getTracks() : [];
+          for (const track of tracks) track.stop();
+          console.warn("qise/camera: a camera stream arrived after the deadline and was stopped");
+          return;
+        }
+        settled = true;
+        clearTimer(timer);
+        resolve(stream);
+      }, (error) => {
+        if (settled) return;
+        settled = true;
+        clearTimer(timer);
+        reject(error);
+      });
+  });
+}
+
+/**
  * Open the camera. Nothing above this line may run before consent.
  *
  * The assertion is the Phase 0a enforcement point, and it throws rather than
@@ -389,6 +436,7 @@ export async function negotiateCaptureMode(track) {
  */
 export async function openCamera({
   consent, mediaDevices, constraints = CAPTURE_CONSTRAINTS, negotiate = true,
+  timeoutMs = CAMERA_OPEN_TIMEOUT_MS, setTimer = setTimeout, clearTimer = clearTimeout,
 }) {
   assertConsentGranted(consent, "getUserMedia");
 
@@ -396,7 +444,7 @@ export async function openCamera({
     throw new Error("qise/camera: no mediaDevices.getUserMedia available on this host");
   }
 
-  const stream = await mediaDevices.getUserMedia(constraints);
+  const stream = await boundedGetUserMedia(mediaDevices, constraints, { timeoutMs, setTimer, clearTimer });
   const [track] = stream.getVideoTracks();
 
   // `negotiate: false` is what the live capture path uses. Locking here is
