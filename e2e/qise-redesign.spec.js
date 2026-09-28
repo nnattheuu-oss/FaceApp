@@ -18,6 +18,10 @@ const palaceReading = {
 
 const reading = {
   timestampIso: "2026-08-11T08:00:00.000Z",
+  // A CURRENT-generation reading: rows without baselineVersion "v2" are what
+  // the pre-upgrade scanner wrote, and currentGenerationReadings() hides them.
+  baselineVersion: "v2",
+  captureClass: "auto",
   baselineProgress: 1,
   metrics: {
     raw: { ming: 56, run: 51, basis: "full" },

@@ -91,6 +91,13 @@ jobs:
       - name: Bundle lint (wellness flavour)
         run: npm run lint:bundle
 
+      # L-10: break each billing rule on purpose; every mutation must be
+      # caught. It ran nowhere in CI before, which is how a CRLF bug in the
+      # script itself went unseen. About 2 s; Linux legs only.
+      - name: Billing falsification (L-10)
+        if: runner.os == 'Linux'
+        run: npm run test:falsify
+
       # The entertainment flavour is what carries the "does not exhibit health
       # features" declaration, so it is linted too — the declaration is only as
       # good as the artefact it describes.

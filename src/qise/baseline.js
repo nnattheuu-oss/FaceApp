@@ -367,6 +367,19 @@ export const isLowConfidence = (c) => c < LOW_CONFIDENCE;
  */
 export const BASELINE_VERSION = "v2";
 
+/**
+ * Rows the current scanner generation wrote. The 9 Aug build shares this
+ * IndexedDB store, and the DB_VERSION 2 upgrade leaves its rows with
+ * `baselineVersion: null`. interpretReading() below already refused them; this
+ * is the same rule for every OTHER consumer (history, share column, patterns,
+ * anchor count, sclera drift window, boot), so an old generation's numbers
+ * never sit beside today's. Beta-bench rows are v2 on purpose and are kept.
+ * Nothing is deleted: export and "delete all" still see every row.
+ */
+export function currentGenerationReadings(rows) {
+  return (rows || []).filter((r) => r && r.baselineVersion === BASELINE_VERSION);
+}
+
 export function interpretReading(metrics, history, options = {}) {
   const axes = axesOf(metrics);
   const currentTimestamp = options.timestampIso;
