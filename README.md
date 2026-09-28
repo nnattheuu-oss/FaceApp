@@ -17,7 +17,7 @@ Two build flavours: `entertainment-only` and `wellness`, selected by
 
 ```bash
 npm start     # http://localhost:5173
-npm test      # 1541 tests after the capture watchdog, 28 Sep 2026 (verify with the runner — this count ages quickly)
+npm test      # 1549 tests after the boot-store fix, 28 Sep 2026 (verify with the runner — this count ages quickly)
 npm run build # dist/
 npm run lint:bundle # compliance guards on dist/
 ```

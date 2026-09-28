@@ -197,6 +197,32 @@ const request = (req) => new Promise((resolve, reject) => {
   req.onerror = () => reject(req.error || new Error("qise/store: request failed"));
 });
 
+/** Long enough for a slow phone's first open; short enough to be noticed. */
+export const STORE_OPEN_TIMEOUT_MS = 10000;
+
+/** The readings database could not be opened: `reason` is "blocked" or "timeout". */
+export class StoreUnavailableError extends Error {
+  constructor(reason) {
+    super(`qise/store: the readings database could not be opened (${reason})`);
+    this.name = "StoreUnavailableError";
+    this.reason = reason;
+  }
+}
+
+/** What to tell a person when the app cannot start because of its store. */
+export function describeStoreError(error) {
+  if (error?.name === "StoreUnavailableError" && error.reason === "blocked") {
+    return "Mien Shiang is still open in another tab or in the installed app. Close it, then reload this page.";
+  }
+  if (error?.name === "StoreUnavailableError") {
+    return "Your saved readings could not be opened. Close other tabs of this app, then reload this page.";
+  }
+  if (/no IndexedDB/.test(String(error?.message))) {
+    return "This browser is not letting the app keep readings on this device. Allow site storage, then reload this page.";
+  }
+  return "The app did not start. Reload this page.";
+}
+
 /**
  * Open the store.
  *
@@ -204,7 +230,11 @@ const request = (req) => new Promise((resolve, reject) => {
  * wrapper can be driven under `node --test` by a fake, and so a host with no
  * IndexedDB fails loudly at the call site rather than at some later `undefined`.
  */
-export async function openStore(indexedDBFactory) {
+export async function openStore(indexedDBFactory, {
+  timeoutMs = STORE_OPEN_TIMEOUT_MS,
+  setTimer = setTimeout,
+  clearTimer = clearTimeout,
+} = {}) {
   const idb = indexedDBFactory || (typeof indexedDB !== "undefined" ? indexedDB : null);
   if (!idb) throw new Error("qise/store: no IndexedDB available on this host");
 
@@ -228,7 +258,55 @@ export async function openStore(indexedDBFactory) {
       };
     }
   };
-  const db = await request(req);
+  // ── AN OPEN THAT CANNOT FINISH MUST SAY SO ─────────────────────────────
+  // boot() awaits this before it wires a single button. Another tab or an
+  // installed copy holding an older version open BLOCKS the upgrade: the
+  // browser fires `blocked` and then leaves the request pending until that
+  // connection closes, which for the 9 Aug build (no versionchange handler)
+  // is never. So a blocked upgrade, or an open that simply never settles,
+  // ends here in a named error rather than a dead welcome screen.
+  // tests/qise/store-open-bounded.test.js.
+  let gaveUp = false;
+  let timer = null;
+  const db = await new Promise((resolve, reject) => {
+    const giveUp = (reason) => {
+      if (gaveUp) return;
+      gaveUp = true;
+      if (timer !== null) clearTimer(timer);
+      reject(new StoreUnavailableError(reason));
+    };
+    req.onblocked = () => giveUp("blocked");
+    // An upgrade that has STARTED is not blocked; a slow migration on an old
+    // phone must not be reported as a hang, so the deadline stops here.
+    const upgrade = req.onupgradeneeded;
+    req.onupgradeneeded = (event) => {
+      if (timer !== null) { clearTimer(timer); timer = null; }
+      if (typeof upgrade === "function") upgrade(event);
+    };
+    req.onsuccess = () => {
+      if (gaveUp) {
+        // Opened after the page gave up: close it, or this tab becomes the
+        // connection that blocks the next attempt.
+        if (req.result && typeof req.result.close === "function") req.result.close();
+        return;
+      }
+      if (timer !== null) clearTimer(timer);
+      resolve(req.result);
+    };
+    req.onerror = () => {
+      if (gaveUp) return;
+      if (timer !== null) clearTimer(timer);
+      reject(req.error || new Error("qise/store: request failed"));
+    };
+    timer = setTimer(() => giveUp("timeout"), timeoutMs);
+  });
+  // The other half: this build must never be the copy that blocks a newer
+  // one. Close on request; the next store call fails loudly and a reload
+  // picks up the new version.
+  db.onversionchange = () => {
+    console.warn("qise/store: a newer version of the app needs the database; closing this connection");
+    db.close();
+  };
 
   const tx = (mode) => db.transaction(STORE_READINGS, mode).objectStore(STORE_READINGS);
 
